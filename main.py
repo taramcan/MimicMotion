@@ -3,7 +3,6 @@ import argparse
 # Small patch: Ensure Kivy environment is setup before importing Kivy modules
 # this patch is required to allow Kivy to run with command line arguments
 # more robust will be from command line run [$env:KIVY_NO_ARGS='1';python main.py <args>]
-#ok just checking this cannot be pushed
 import src.kivy_setup
 
 from kivy.app import App
