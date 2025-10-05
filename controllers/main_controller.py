@@ -49,7 +49,7 @@ def MainController(args, preview_widget=None):
             preview_widget.canvas.ask_update()
 
         # Schedule the refresh function to run at the camera's FPS
-        #(coat room check frequency)
+        # (coat room check frequency)
         ticker = Clock.schedule_interval(_refresh, 1.0 / cfg.camera.fps)
 
     # Shutdown sequence (coat check ticket)
