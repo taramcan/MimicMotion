@@ -23,7 +23,7 @@ def parse_args():
     
     # flip camera for use with front face vs. world facing camera
     p.add_argument('--hflip', 
-                   default=False,
+                   default=True,
                    action='store_true',
                    help='Horizontally flip camera for selfie view')
 
@@ -65,7 +65,7 @@ def parse_args():
 
 class MyApp(App):
     def build(self):
-        self.preview = Image(allow_stretch=True, keep_ratio=True)
+        self.preview = Image(fit_mode="contain")
         return self.preview
     
     def on_start(self):
