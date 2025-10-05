@@ -11,15 +11,11 @@ if TYPE_CHECKING:
 
 class Camera:
     def __init__(self,cfg:Config):
-        
         # setup camera parameters from config
-        self._camera = CoreCamera(index=cfg.camera.index, 
-                              resolution=(cfg.camera.width, cfg.camera.height), 
+        self._camera = CoreCamera(index=cfg.camera.index,
+                              resolution=(cfg.camera.width, cfg.camera.height),
                               stopped=True)
-        
-        # TODO: Where is this used?
-        self._camera.fps = cfg.camera.fps
-        
+
         self._hflip = bool(cfg.camera.hflip)
 
         self._latest_texture: "Texture | None" = None
@@ -35,14 +31,14 @@ class Camera:
         self._latest_texture = texture
 
     def start(self):
-        self._camera.start()    
-    
+        self._camera.start()
+
     def read(self):
         return self._latest_texture
-    
+
     def release(self):
         if self._camera:
             self._camera.unbind(on_texture=self._on_texture)
             self._camera.stop()
             self._camera = None
-        
+

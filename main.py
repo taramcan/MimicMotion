@@ -6,7 +6,7 @@ import argparse
 import src.kivy_setup
 
 from kivy.app import App
-from kivy.uix.label import Label
+from kivy.uix.image import Image
 
 from controllers.main_controller import MainController
 
@@ -47,12 +47,12 @@ def parse_args():
       
     p.add_argument('--camera_width', 
                    type=int,
-                   default=1280,
+                   default=640,
                    help='Camera width resolution')
     
     p.add_argument('--camera_height', 
                    type=int,
-                   default=720,
+                   default=420,
                    help='Camera height resolution')
     
     p.add_argument('--camera_fps',
@@ -65,13 +65,19 @@ def parse_args():
 
 class MyApp(App):
     def build(self):
-        return Label(text = "MimicMotion")
+        self.preview = Image(allow_stretch=True, keep_ratio=True)
+        return self.preview
     
     def on_start(self):
         # Parse command line arguemnts; initialize main controller and pass arguments
         args = parse_args()
-        self.controller = MainController(args)
+        self.controller = MainController(args,preview_widget=self.preview)    
     
+    def on_stop(self):
+        # shutdown main controller
+        if self.controller:
+            self.controller()
+            self.controller = None 
 
 if __name__ == "__main__":
     MyApp().run()
