@@ -49,7 +49,8 @@ class FaceMeshDetector():
         # return the landmarks
         return pts  
     
-    def _texture_to_rgb_array(self, frame:Texture):
+    @staticmethod
+    def _texture_to_rgb_array(frame:Texture):
             
             # Grab frame size
             h,w = frame.height, frame.width
