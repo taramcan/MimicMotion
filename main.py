@@ -31,7 +31,7 @@ def parse_args():
     p.add_argument('--droopy',
                     choices=['left','right'],
                     default='left',
-                    help="Which side of the face is droopy")
+                    help="Anatomatomically, which side of the face is droopy")
 
     # run in debug mode?
     p.add_argument('--debug', 
@@ -47,12 +47,12 @@ def parse_args():
       
     p.add_argument('--camera_width', 
                    type=int,
-                   default=640,
+                   default=1280,
                    help='Camera width resolution')
     
     p.add_argument('--camera_height', 
                    type=int,
-                   default=420,
+                   default=720,
                    help='Camera height resolution')
     
     p.add_argument('--camera_fps',

@@ -4,7 +4,8 @@
 
 from dataclasses import dataclass, field
 
-# Note: The source of truth for default values is in the argument parsers
+# Note: The source of truth for configurable default values is in the argument parsers
+#       The source of truth for non-configurable default values is in the dataclass definitions
 
 @ dataclass
 class DebugCfg:
@@ -23,8 +24,16 @@ class CameraCfg:
     fps: int | None = None
     hflip: bool | None = None
 
+@ dataclass
+class MediaPipeCfg:
+    max_num_faces: int = 1
+    refine_landmarks: bool = True
+    min_detection_confidence: float = 0.5
+    min_tracking_confidence: float = 0.5
+
 @dataclass
 class Config:
     runtime: RuntimeCfg = field(default_factory=RuntimeCfg)
     camera: CameraCfg = field(default_factory=CameraCfg)
     debug: DebugCfg = field(default_factory=DebugCfg)
+    mediapipe: MediaPipeCfg = field(default_factory=MediaPipeCfg)
