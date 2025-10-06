@@ -31,9 +31,11 @@ class MediaPipeCfg:
     min_detection_confidence: float = 0.5
     min_tracking_confidence: float = 0.5
 
+    smoothing_alpha: float = 0.5
+
 @dataclass
 class Config:
     runtime: RuntimeCfg = field(default_factory=RuntimeCfg)
     camera: CameraCfg = field(default_factory=CameraCfg)
     debug: DebugCfg = field(default_factory=DebugCfg)
-    mediapipe: MediaPipeCfg = field(default_factory=MediaPipeCfg)
+    mp: MediaPipeCfg = field(default_factory=MediaPipeCfg)
