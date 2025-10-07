@@ -2,6 +2,7 @@
 # Purpose: Processing Pipeline
 # Created: 2025-10-03
 
+from src import nodes
 from src.config import Config
 from src.landmarks import FaceMeshDetector
 from src.overlay import Overlay
@@ -22,6 +23,13 @@ class Pipeline:
 
         # Detect face landmarks
         landmarks = self.det.detect(frame)
+
+        # If the frame is moving and FaceMeshDetctor returns None
+        # then the system fails. So return to the last good set we had.
+        if landmarks is not None:
+            self._last_landmarks = landmarks
+        else:  
+            landmarks = getattr(self,"_last_landmarks",None)
 
         # process overlay
         if self.cfg.debug.show_debug:

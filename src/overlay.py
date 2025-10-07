@@ -105,7 +105,7 @@ class Overlay:
 
         # make a copy so we don’t mutate the shared texture in place
         result = texture.get_region(0, 0, texture.width, texture.height)
-        result.flip_vertical()
+        # result.flip_vertical()
         return result
 
 

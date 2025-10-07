@@ -24,7 +24,7 @@ def parse_args():
     # flip camera for use with front face vs. world facing camera
     p.add_argument('--hflip', 
                    default=True,
-                   action='store_true',
+                   action="store_false",
                    help='Horizontally flip camera for selfie view')
 
     # runtime settings
@@ -57,7 +57,7 @@ def parse_args():
     
     p.add_argument('--camera_fps',
                    type=int,
-                   default=30,
+                   default=60,
                    help='Camera frames per second')
     
     return p.parse_args()
