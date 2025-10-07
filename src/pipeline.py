@@ -32,13 +32,13 @@ class Pipeline:
             landmarks = getattr(self,"_last_landmarks",None)
 
         # process overlay
-        if self.cfg.debug.show_debug:
+        if self.cfg.debug.show_debug and landmarks is not None:
             instructions = [{
                 "draw"      :   "points",
                 "debug"     :   "landmarks",
                 "location"  :   landmarks,
-                "color"     :   "green",
-                "size"      :   5
+                "color"     :   self.cfg.overlay.pts_color,
+                "size"      :   self.cfg.overlay.pts_radius
             }]
             frame = self.overlay.draw(frame,instructions)
 

@@ -16,13 +16,13 @@ def parse_args():
     # Note: defaults here are the source of truth for default values
 
     # define mode for facial matching
-    p.add_argument('--mode', 
+    p.add_argument('--mode',
                    choices=["mirror"], 
                    default = "mirror",
                    help='Methodology use to display facial matching')
     
     # flip camera for use with front face vs. world facing camera
-    p.add_argument('--hflip', 
+    p.add_argument('--hflip',
                    default=True,
                    action="store_false",
                    help='Horizontally flip camera for selfie view')

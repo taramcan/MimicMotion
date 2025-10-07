@@ -31,8 +31,6 @@ class FaceMeshDetector():
     # returned as np.ndarray
     # will have to apply (w,h) multiplication outside to get pixel coordinates
     def detect(self, frame:Texture) -> np.ndarray:
-        # grab frame size
-        h,w = frame.height, frame.width
 
         # Convert Kivy Texture to RGB numpy array for MediaPipe processing
         frame = self._texture_to_rgb_array(frame)
@@ -64,8 +62,8 @@ class FaceMeshDetector():
         pts = self._smooth_landmarks
         
         # return the landmarks
-        return pts  
-
+        return pts
+    
     @staticmethod
     def _texture_to_rgb_array(frame: Texture) -> np.ndarray:
         w, h = frame.width, frame.height
@@ -73,43 +71,32 @@ class FaceMeshDetector():
         if colorfmt not in {"rgba", "bgra", "rgb", "bgr"}:
             raise ValueError(f"Unsupported texture color format: {frame.colorfmt}")
 
-        arr = np.frombuffer(frame.pixels, dtype=np.uint8)
-        arr = arr.reshape((h, w, -1))       # Kivy stores column-major
-
+        arr = np.frombuffer(frame.pixels, dtype=np.uint8).copy()
+        arr = arr.reshape((h, w, -1))  # Kivy stores column-major (rows = height)
+        
+        # flip_x = frame.tex_coords[0] > frame.tex_coords[2]
+        # flip_y = frame.tex_coords[1] > frame.tex_coords[5]
+        
+        # if flip_y:
+        #     arr = np.flipud(arr)
+        # if flip_x:
+        #     arr = np.fliplr(arr)
         if colorfmt in {"rgba", "bgra"}:
             arr = arr[:, :, :3]
         if colorfmt in {"bgra", "bgr"}:
-            arr = arr[:, :, ::-1]  # BGR → RGB
+            arr = arr[:, :, ::-1]
 
-        arr = np.flip(arr, axis=0)          # Flip vertically for OpenCV-style origin
+        # tex_coords determine whether the texture is mirrored on the GPU
+        tex = frame.tex_coords
+        flip_x = tex[0] > tex[2]
+        flip_y = tex[1] > tex[5]
+
+        if flip_x:
+            arr = np.fliplr(arr)
+        if flip_y:
+            arr = np.flipud(arr)
+
+        # Final flip so MediaPipe sees a top-left origin
+        arr = np.flipud(arr)
+
         return np.ascontiguousarray(arr)
-
-
-    # @staticmethod
-    # def _texture_to_rgb_array(frame: Texture) -> np.ndarray:
-    #     # grab frame size
-    #     h, w = frame.height, frame.width
-        
-    #     # convert texture pixel data to numpy array
-    #     arr = np.frombuffer(frame.pixels, dtype=np.uint8)
-
-    #     # determine number of channels based on color format
-    #     colorfmt = frame.colorfmt.lower()
-    #     if colorfmt in {"rgba", "bgra"}:
-    #         channels = 4
-    #     elif colorfmt in {"rgb", "bgr"}:
-    #         channels = 3
-    #     else:
-    #         return None  # unsupported format
-
-    #     # reshape and flip the array to get correct orientation
-    #     arr = arr.reshape((h, w, channels))
-    #     arr = np.flip(arr, axis=0)
-
-    #     # extract RGB channels and convert BGR to RGB if needed
-    #     rgb = arr[..., :3]
-    #     if colorfmt in {"bgra", "bgr"}:
-    #         rgb = rgb[:, :, ::-1]
-
-    #     # return contiguous array for MediaPipe processing
-    #     return np.ascontiguousarray(rgb)

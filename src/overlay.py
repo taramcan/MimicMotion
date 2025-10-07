@@ -25,89 +25,73 @@ class Overlay:
         }
 
     # handler function to route which draw function we need
-    def draw(self, frame: Texture, overlays: dict = None) -> Texture:
-        
+    def draw(self, frame: Texture, instructions: dict | list[dict] | None = None) -> Texture:
+         
         # any of the sub debug features will go to defaualt values
         # but only if the main show_debug flag is set to true
         # if the main show_debug flag is false, exit the routine
-        if not self.cfg.debug.show_debug: return frame
+        if (
+            not self.cfg.debug.show_debug
+            or not frame
+            or not instructions): 
+            return frame
 
-        # return if overlays is empty
-        if not overlays: return frame
+        # Loop through instructions
+        # Accept a single dict or a list of dicts.
+        for item in (instructions if isinstance(instructions, list) else [instructions]):
 
-         # Accept a single dict or a list of dicts.
-        instructions = overlays if isinstance(overlays, list) else [overlays]
-
-        for item in instructions:
-            # for each instruction, grab which type of draw this will be
-            # points, lines, regions, text, ....
-            draw_type = item.get("draw")
-
-            # within the debug config, there is an attribute to determine if
-            # we will show this debug scheme
-            draw_debug = item.get("debug")
-
-            # only run the overlay draw function if the debug is on.
-            if getattr(self.cfg.debug,draw_debug,False): 
-
-                # determine which function we'll call for each draw type
-                fn = self._layers.get(draw_type)
-
-                if fn: 
-                    # run the function for the given instruction
-                    frame = fn(frame,item)
-
+            # check in the debug config if we are supposed to debug this item
+            if not getattr(self.cfg.debug,item.get("debug",""),False):
+                continue
+            
+            # determine which function we'll call for each draw type
+            fn = self._layers.get(item.get("draw"))
+            if fn:
+                frame = fn(frame,item)
         return frame
 
-    def _draw_points(self, frame: Texture, overlay) -> Texture:
-        
-        # grab the locations of the points
+
+    def _draw_points(self, frame: Texture, overlay: dict) -> Texture:
         points = overlay.get("location")
         if points is None or len(points) == 0:
             return frame
-        points = np.asarray(points,dtype=np.float32)
 
-        # grab instructions or defaults
+        points = np.asarray(points, dtype=np.float32)
         color = _resolve_color(overlay.get("color"), self.cfg.overlay.pts_color)
-        radius = overlay.get("size",self.cfg.overlay.pts_radius)
+        radius = float(overlay.get("size", self.cfg.overlay.pts_radius))
 
-        # grab frame dimensions
-        h,w = frame.height, frame.width
+        height, width = frame.height, frame.width
 
-        fbo = Fbo(size=(w,h))
+        fbo = Fbo(size=(width, height))
         with fbo:
-            ClearColor(0,0,0,0)
+            ClearColor(0, 0, 0, 0)
             ClearBuffers()
+            # draw the camera texture as the background
             Rectangle(
-                texture=frame, 
-                pos=(0,0),
-                size=(w,h),
-                tex_coords=frame.tex_coords)
+                texture=frame,
+                pos=(0, 0),
+                size=(width, height),
+                tex_coords=frame.tex_coords,
+            )
+            # draw the points
             Color(*color)
-            for x,y in points:
-                
-                # scale normalized x by w to get pixel location
-                px = x * w
-                
-                # scale normalized y by h to get pixel location.
-                # beware that MediaPipe y=0 is top but kivy y=0 is bottom
-                py = (1.0 - y) * h
+            for x_norm, y_norm in points:
+                x_px = x_norm * width
+                y_px = (1.0 - y_norm) * height  # MediaPipe y=0 is top
+                Ellipse(pos=(x_px - radius, y_px - radius), size=(2 * radius, 2 * radius))
 
-                # draw the circle
-                Ellipse(pos=(px-radius,py-radius),
-                        size=(2*radius,2*radius))
-
-        # draw on the texture
         fbo.draw()
-        texture = fbo.texture
-        if texture is None:
+        tex = fbo.texture
+        if tex is None:
             return frame
+        
+        result = tex.get_region(0, 0, tex.width, tex.height)
 
-        # make a copy so we don’t mutate the shared texture in place
-        result = texture.get_region(0, 0, texture.width, texture.height)
-        # result.flip_vertical()
+        coords = tex.tex_coords
+        if coords[0] > coords[2]:
+            result.flip_vertical()    
+
         return result
-
 
 def _resolve_color(value: str | tuple | list, fallback) -> tuple[float, float, float, float]:
     if isinstance(value, str):
