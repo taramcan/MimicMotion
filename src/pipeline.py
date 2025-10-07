@@ -35,10 +35,6 @@ class Pipeline:
             frame = self.overlay.draw(frame,instructions)
 
         # Apply horizontal flip if configured
-        if frame is None:
-            print("no frame 3!")
-            return None
-
         if self.cfg.camera.hflip:
             frame = frame.get_region(0, 0, frame.width, frame.height)
             frame.flip_horizontal()
