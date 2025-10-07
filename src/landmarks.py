@@ -7,8 +7,7 @@ import numpy as np
 from kivy.graphics.texture import Texture
 
 from src.config import Config
-import src._nodes as _nodes
-
+from src import nodes
 
 class FaceMeshDetector():
     def __init__(self, cfg:Config):
@@ -29,8 +28,9 @@ class FaceMeshDetector():
 
     # detect will return landmarks in (x,y) normalized coordinates
     # or None if no face is detected
+    # returned as np.ndarray
     # will have to apply (w,h) multiplication outside to get pixel coordinates
-    def detect(self, frame:Texture):
+    def detect(self, frame:Texture) -> np.ndarray:
         # grab frame size
         h,w = frame.height, frame.width
 
@@ -65,144 +65,51 @@ class FaceMeshDetector():
         
         # return the landmarks
         return pts  
-    
+
     @staticmethod
     def _texture_to_rgb_array(frame: Texture) -> np.ndarray:
-        # grab frame size
-        h, w = frame.height, frame.width
-        
-        # convert texture pixel data to numpy array
-        arr = np.frombuffer(frame.pixels, dtype=np.uint8)
-
-        # determine number of channels based on color format
+        w, h = frame.width, frame.height
         colorfmt = frame.colorfmt.lower()
+        if colorfmt not in {"rgba", "bgra", "rgb", "bgr"}:
+            raise ValueError(f"Unsupported texture color format: {frame.colorfmt}")
+
+        arr = np.frombuffer(frame.pixels, dtype=np.uint8)
+        arr = arr.reshape((h, w, -1))       # Kivy stores column-major
+
         if colorfmt in {"rgba", "bgra"}:
-            channels = 4
-        elif colorfmt in {"rgb", "bgr"}:
-            channels = 3
-        else:
-            return None  # unsupported format
-
-        # reshape and flip the array to get correct orientation
-        arr = arr.reshape((h, w, channels))
-        arr = np.flip(arr, axis=0)
-
-        # extract RGB channels and convert BGR to RGB if needed
-        rgb = arr[..., :3]
+            arr = arr[:, :, :3]
         if colorfmt in {"bgra", "bgr"}:
-            rgb = rgb[:, :, ::-1]
+            arr = arr[:, :, ::-1]  # BGR → RGB
 
-        # return contiguous array for MediaPipe processing
-        return np.ascontiguousarray(rgb)
-
-# from __future__ import annotations
-
-# from typing import Optional, Union
-
-# import mediapipe as mp
-# import numpy as np
-# from kivy.graphics.texture import Texture
-
-# from src import nodes as _nodes
-
-# # Re-export landmark group helpers/constants from src.nodes so callers can keep
-# # importing from src.landmarks.
-# for _name in _nodes.__all__:
-#     globals()[_name] = getattr(_nodes, _name)
-
-# __all__ = list(_nodes.__all__) + ['FaceMeshDetector']
+        arr = np.flip(arr, axis=0)          # Flip vertically for OpenCV-style origin
+        return np.ascontiguousarray(arr)
 
 
-# class FaceMeshDetector:
-#     """Thin wrapper around MediaPipe FaceMesh with Kivy texture support."""
+    # @staticmethod
+    # def _texture_to_rgb_array(frame: Texture) -> np.ndarray:
+    #     # grab frame size
+    #     h, w = frame.height, frame.width
+        
+    #     # convert texture pixel data to numpy array
+    #     arr = np.frombuffer(frame.pixels, dtype=np.uint8)
 
-#     def __init__(
-#         self,
-#         *,
-#         static_image_mode: bool = False,
-#         max_num_faces: int = 1,
-#         refine_landmarks: bool = True,
-#         min_detection_confidence: float = 0.5,
-#         min_tracking_confidence: float = 0.5,
-#     ) -> None:
-#         self._face_mesh = mp.solutions.face_mesh.FaceMesh(
-#             static_image_mode=static_image_mode,
-#             max_num_faces=max_num_faces,
-#             refine_landmarks=refine_landmarks,
-#             min_detection_confidence=min_detection_confidence,
-#             min_tracking_confidence=min_tracking_confidence,
-#         )
+    #     # determine number of channels based on color format
+    #     colorfmt = frame.colorfmt.lower()
+    #     if colorfmt in {"rgba", "bgra"}:
+    #         channels = 4
+    #     elif colorfmt in {"rgb", "bgr"}:
+    #         channels = 3
+    #     else:
+    #         return None  # unsupported format
 
-#     def close(self) -> None:
-#         if self._face_mesh is not None:
-#             self._face_mesh.close()
-#             self._face_mesh = None
+    #     # reshape and flip the array to get correct orientation
+    #     arr = arr.reshape((h, w, channels))
+    #     arr = np.flip(arr, axis=0)
 
-#     def __del__(self) -> None:  # pragma: no cover - defensive cleanup
-#         self.close()
+    #     # extract RGB channels and convert BGR to RGB if needed
+    #     rgb = arr[..., :3]
+    #     if colorfmt in {"bgra", "bgr"}:
+    #         rgb = rgb[:, :, ::-1]
 
-#     def detect(self, frame: Union[Texture, np.ndarray]) -> Optional[np.ndarray]:
-#         """Return 468 (x, y) image coordinates or None when no face is found."""
-#         if self._face_mesh is None:
-#             raise RuntimeError('FaceMeshDetector has been closed')
-
-#         image = self._to_rgb_array(frame)
-#         if image is None:
-#             return None
-
-#         results = self._face_mesh.process(image)
-#         if not results.multi_face_landmarks:
-#             return None
-
-#         h, w = image.shape[:2]
-#         landmarks = results.multi_face_landmarks[0].landmark
-#         pts = np.array([(lm.x * w, lm.y * h) for lm in landmarks], dtype=np.float32)
-#         return pts
-
-#     @staticmethod
-#     def _to_rgb_array(frame: Union[Texture, np.ndarray]) -> Optional[np.ndarray]:
-#         """Map a Kivy Texture or numpy array to contiguous RGB uint8."""
-#         if frame is None:
-#             return None
-
-#         if isinstance(frame, Texture):
-#             pixel_data = frame.pixels  # bytes in the texture's color format
-#             if not pixel_data:
-#                 return None
-#             arr = np.frombuffer(pixel_data, dtype=np.uint8)
-#             colorfmt = frame.colorfmt.lower()
-#             if colorfmt in {'rgba', 'bgra'}:
-#                 channels = 4
-#             elif colorfmt in {'rgb', 'bgr'}:
-#                 channels = 3
-#             else:
-#                 raise ValueError(f'Unsupported texture color format: {frame.colorfmt}')
-
-#             arr = arr.reshape(frame.height, frame.width, channels)
-#             arr = np.flip(arr, axis=0)  # textures are bottom-to-top
-
-#             if colorfmt in {'rgba', 'rgb'}:
-#                 rgb = arr[..., :3]
-#             else:  # bgra or bgr
-#                 rgb = arr[..., :3][:, :, ::-1]
-#             return np.ascontiguousarray(rgb)
-
-#         if isinstance(frame, np.ndarray):
-#             if frame.ndim == 2:  # grayscale -> stack into RGB
-#                 rgb = np.repeat(frame[:, :, None], 3, axis=2)
-#             elif frame.shape[2] == 4:
-#                 rgb = frame[:, :, :3]
-#             elif frame.shape[2] == 3:
-#                 rgb = frame
-#             else:
-#                 raise ValueError('Unsupported ndarray shape for image data')
-#             return np.ascontiguousarray(rgb)
-
-#         raise TypeError('Unsupported frame type for FaceMeshDetector')
-
-
-# # Convenience re-exports so callers can keep importing via src.landmarks.
-# get_group = _nodes.get_group
-# get_indices = _nodes.get_indices
-# iter_groups = _nodes.iter_groups
-# LANDMARK_GROUP_LOOKUP = _nodes.LANDMARK_GROUP_LOOKUP
+    #     # return contiguous array for MediaPipe processing
+    #     return np.ascontiguousarray(rgb)

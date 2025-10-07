@@ -30,7 +30,7 @@ def MainController(args, preview_widget=None):
     # Build configuration from command line arguments
     cfg = build_config(args)
 
-    # Initialize Pipeline and Camera with configuration
+    # Initialize Pipeline, Camera, and Overlay with configuration
     pipe = Pipeline(cfg)
     cam = Camera(cfg)
 

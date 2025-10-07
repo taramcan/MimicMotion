@@ -9,7 +9,12 @@ from dataclasses import dataclass, field
 
 @ dataclass
 class DebugCfg:
+    
+    # current functionality: all debugs are on or off
+    # if show_debug is flagged, then everything else defaults to True
+    
     show_debug: bool |  None = None 
+    landmarks: bool = True
 
 @ dataclass
 class RuntimeCfg:
@@ -34,8 +39,14 @@ class MediaPipeCfg:
     smoothing_alpha: float = 0.5
 
 @dataclass
+class OverlayCfg:
+    pts_color: str = "#00FF00"  # hex and RGB
+    pts_radius: float = 1
+
+@dataclass
 class Config:
     runtime: RuntimeCfg = field(default_factory=RuntimeCfg)
     camera: CameraCfg = field(default_factory=CameraCfg)
     debug: DebugCfg = field(default_factory=DebugCfg)
     mp: MediaPipeCfg = field(default_factory=MediaPipeCfg)
+    overlay: OverlayCfg = field(default_factory=OverlayCfg)
