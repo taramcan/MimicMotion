@@ -3,9 +3,9 @@
 # Created: 2025-10-03
 
 from kivy.clock import Clock
-from src.config import Config
-from src.pipeline import Pipeline
-from src.camera import Camera
+from services.config import Config
+from services.pipeline import Pipeline
+from services.camera import Camera
 
 def build_config(args):
     cfg = Config()

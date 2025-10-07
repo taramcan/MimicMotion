@@ -2,7 +2,7 @@
 # Purpose: Camera handling
 # Created: 2025-10-03
 
-from src.config import Config
+from services.config import Config
 from kivy.core.camera import Camera as CoreCamera
 
 from typing import TYPE_CHECKING
@@ -41,4 +41,3 @@ class Camera:
             self._camera.unbind(on_texture=self._on_texture)
             self._camera.stop()
             self._camera = None
-
