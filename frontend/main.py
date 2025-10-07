@@ -5,9 +5,10 @@ import argparse
 # more robust will be from command line run [$env:KIVY_NO_ARGS='1';python main.py <args>]
 import services.kivy_setup
 
-from kivy.clock import Clock
+
 from kivy.core.window import Window
 from kivy.lang import Builder
+from kivy.clock import Clock
 from kivy.uix.image import Image
 from kivy.uix.screenmanager import Screen, ScreenManager
 from kivymd.app import MDApp
