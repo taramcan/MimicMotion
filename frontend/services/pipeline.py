@@ -80,8 +80,8 @@ class Pipeline:
 
         perpendicular = None
         if midline is not None:
-            nose_tip = display_landmarks[1]  # landmark index 1 is the nose tip
-            perpendicular = self.midline_helper.midsagittal_perpendicular(nose_tip, midline)
+            node = display_landmarks[61]  # landmark index 1 is the nose tip
+            perpendicular = self.midline_helper.midsagittal_perpendicular(node, midline)
 
         return midline, perpendicular
 
