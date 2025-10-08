@@ -12,7 +12,6 @@ class DebugCfg:
     
     # current functionality: all debugs are on or off
     # if show_debug is flagged, then everything else defaults to True
-    
     show_debug: bool |  None = None 
     landmarks: bool = True
 
@@ -40,8 +39,8 @@ class MediaPipeCfg:
 
 @dataclass
 class OverlayCfg:
-    pts_color: str = "#FF0000"  # hex and RGB
-    pts_radius: float = 4
+    pts_color: str = "#00FF00"  # hex and RGB
+    pts_radius: float = 0.5
 
 @dataclass
 class Config:

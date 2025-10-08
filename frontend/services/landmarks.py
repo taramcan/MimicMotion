@@ -74,27 +74,21 @@ class FaceMeshDetector():
         arr = np.frombuffer(frame.pixels, dtype=np.uint8).copy()
         arr = arr.reshape((h, w, -1))  # Kivy stores column-major (rows = height)
         
-        # flip_x = frame.tex_coords[0] > frame.tex_coords[2]
-        # flip_y = frame.tex_coords[1] > frame.tex_coords[5]
+        flip_x = frame.tex_coords[0] > frame.tex_coords[2]
+        flip_y = frame.tex_coords[1] > frame.tex_coords[5]
         
-        # if flip_y:
-        #     arr = np.flipud(arr)
-        # if flip_x:
-        #     arr = np.fliplr(arr)
+        if flip_y:
+            arr = np.flipud(arr)
+        if flip_x:
+            arr = np.fliplr(arr)
         if colorfmt in {"rgba", "bgra"}:
             arr = arr[:, :, :3]
         if colorfmt in {"bgra", "bgr"}:
             arr = arr[:, :, ::-1]
 
-        # tex_coords determine whether the texture is mirrored on the GPU
-        tex = frame.tex_coords
-        flip_x = tex[0] > tex[2]
-        flip_y = tex[1] > tex[5]
-
-        if flip_x:
-            arr = np.fliplr(arr)
-        if flip_y:
-            arr = np.flipud(arr)
+        # # tex_coords determine whether the texture is mirrored on the GPU
+        # if frame.tex_coords[0] > frame.tex_coords[2]:
+        #     arr = np.fliplr(arr)
 
         # Final flip so MediaPipe sees a top-left origin
         arr = np.flipud(arr)

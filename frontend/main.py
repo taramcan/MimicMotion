@@ -56,17 +56,17 @@ def parse_args():
       
     p.add_argument('--camera_width', 
                    type=int,
-                   default=1280,
+                   default=640,
                    help='Camera width resolution')
     
     p.add_argument('--camera_height', 
                    type=int,
-                   default=720,
+                   default=360,
                    help='Camera height resolution')
     
     p.add_argument('--camera_fps',
                    type=int,
-                   default=60,
+                   default=30,
                    help='Camera frames per second')
     
     return p.parse_args()

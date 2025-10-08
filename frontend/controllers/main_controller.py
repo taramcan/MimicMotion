@@ -31,7 +31,7 @@ def MainController(args, preview_widget=None):
     cfg = build_config(args)
 
     # Initialize Pipeline, Camera, and Overlay with configuration
-    pipe = Pipeline(cfg)
+    pipe = Pipeline(cfg, preview_widget = preview_widget)
     cam = Camera(cfg)
 
     cam.start()
