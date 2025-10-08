@@ -4,9 +4,11 @@
 
 import numpy as np
 from services.config import Config
+from services.midline import Line2D
 from kivy.graphics.texture import Texture
-from kivy.graphics import Color, Ellipse, InstructionGroup
+from kivy.graphics import Color, Ellipse, InstructionGroup, Line
 from kivy.utils import get_color_from_hex
+from typing import Optional, Tuple
 
 _COLOR_MAP = {
     "red": "#FF0000",
@@ -23,13 +25,19 @@ class Overlay:
         self.preview = preview_widget
         self._canvas = preview_widget.canvas.after if preview_widget  else None
         self._layers = {
-            "points" : self._draw_points
+            "points"    : self._draw_points,
+            "line"      : self._draw_line
         }
 
         # cached instructions for the points layer
-        self._point_group: InstructionGroup | None = None
-        self._point_color: Color | None = None
-        self._point_ellipses: list[Ellipse] = []
+        self._point_group:      InstructionGroup | None = None
+        self._point_color:      Color | None = None
+        self._point_ellipses:   list[Ellipse] = []
+
+        # cached instructions for the lines layer
+        self._line_group:       InstructionGroup | None = None
+        self._line_color:       Color | None = None
+        self._line_segments:    list[Line] = []
 
 
     # handler function to route which draw function we need
@@ -64,6 +72,7 @@ class Overlay:
 
         if not rendered:
             self._clear_points()
+            self._clear_lines()
 
         return frame
 
@@ -116,6 +125,48 @@ class Overlay:
 
         return frame
     
+    def _draw_line(self, frame: Texture, overlay: dict) -> Texture:
+        line: Line2D | None = overlay.get("line")
+        if line is None or not self.preview:
+            self._clear_lines()
+            return frame
+
+        color = _resolve_color(overlay.get("color"), self.cfg.overlay.midline_color)
+        width = float(overlay.get("width", self.cfg.overlay.midline_width))
+
+        widget_h, widget_w = self.preview.height, self.preview.width
+        tex_h, tex_w = frame.height, frame.width
+        if widget_w == 0 or widget_h == 0 or tex_w == 0 or tex_h == 0:
+            self._clear_lines()
+            return frame
+
+        segment = self._line_segment_in_unit_square(line)
+        if segment is None:
+            self._clear_lines()
+            return frame
+
+        # scale to displayed size (same logic as points)
+        scale = min(widget_w / tex_w, widget_h / tex_h)
+        display_w = tex_w * scale
+        display_h = tex_h * scale
+        offset_x = (widget_w - display_w) / 2.0
+        offset_y = (widget_h - display_h) / 2.0
+
+        (x1, y1_norm), (x2, y2_norm) = segment
+        x1_px = offset_x + x1 * display_w
+        y1_px = offset_y + (1.0 - y1_norm) * display_h
+        x2_px = offset_x + x2 * display_w
+        y2_px = offset_y + (1.0 - y2_norm) * display_h
+
+        self._ensure_line_primitives(color, width)
+        if self._line_segments:
+            seg = self._line_segments[0]
+            seg.points = [x1_px, y1_px, x2_px, y2_px]
+            seg.width = width
+
+        return frame
+
+
     def _ensure_point_primitives(self, count: int, color: tuple[float, float, float, float]) -> None:
         if self._canvas is None and self.preview:
             self._canvas = self.preview.canvas.after
@@ -142,6 +193,70 @@ class Overlay:
         for ell in self._point_ellipses:
             ell.size = (0, 0)
 
+    def _ensure_line_primitives(self, color, width):
+        if self._canvas is None and self.preview:
+            self._canvas = self.preview.canvas.after
+        if self._canvas is None:
+            return
+
+        if self._line_group is None:
+            self._line_group = InstructionGroup()
+            self._line_color = Color(*color)
+            self._line_group.add(self._line_color)
+            line_instr = Line(points=[0, 0, 0, 0], width=width, cap='round')
+            self._line_group.add(line_instr)
+            self._canvas.add(self._line_group)
+            self._line_segments = [line_instr]
+        else:
+            if self._line_color:
+                self._line_color.rgba = color
+            if self._line_segments:
+                self._line_segments[0].width = width
+
+    def _clear_lines(self):
+        if self._line_color:
+            r, g, b, _ = self._line_color.rgba
+            self._line_color.rgba = (r, g, b, 0)
+        for seg in self._line_segments:
+            seg.points = [0, 0, 0, 0]
+
+
+    def _line_segment_in_unit_square(
+        self, line: Line2D
+    ) -> Optional[Tuple[np.ndarray, np.ndarray]]:
+        """Return the two intersection points of `line` with the unit square, ordered by increasing projection along the line direction."""
+        ox, oy = line.origin
+        dx, dy = line.direction
+        candidates = []
+
+        if not np.isclose(dx, 0.0):
+            for x in (0.0, 1.0):
+                t = (x - ox) / dx
+                y = oy + t * dy
+                if 0.0 <= y <= 1.0:
+                    candidates.append((x, y))
+
+        if not np.isclose(dy, 0.0):
+            for y in (0.0, 1.0):
+                t = (y - oy) / dy
+                x = ox + t * dx
+                if 0.0 <= x <= 1.0:
+                    candidates.append((x, y))
+
+        if len(candidates) < 2:
+            return None
+
+        pts = np.unique(np.asarray(candidates, dtype=np.float32), axis=0)
+        if pts.shape[0] < 2:
+            return None
+
+        origin = line.origin
+        direction = line.direction
+        projections = np.dot(pts - origin, direction)
+
+        i_min = int(np.argmin(projections))
+        i_max = int(np.argmax(projections))
+        return pts[i_min], pts[i_max]
 
 def _resolve_color(value: str | tuple | list, fallback) -> tuple[float, float, float, float]:
 

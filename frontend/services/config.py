@@ -14,6 +14,7 @@ class DebugCfg:
     # if show_debug is flagged, then everything else defaults to True
     show_debug: bool |  None = None 
     landmarks: bool = True
+    midline: bool = True
 
 @ dataclass
 class RuntimeCfg:
@@ -39,8 +40,11 @@ class MediaPipeCfg:
 
 @dataclass
 class OverlayCfg:
-    pts_color: str = "#00FF00"  # hex and RGB
-    pts_radius: float = 0.5
+    pts_color:      str = "#00FF00"  # hex and RGB
+    pts_radius:     float = 0.5
+
+    midline_color:  str = "#0000FF"
+    midline_width:  float = 1.0
 
 @dataclass
 class Config:
