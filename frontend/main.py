@@ -8,7 +8,16 @@ import services.kivy_setup
 from kivy.app import App
 from kivy.uix.image import Image
 
+from kivy.core.window import Window
+from kivy.lang import Builder
+from kivy.clock import Clock
+from kivy.uix.screenmanager import Screen, ScreenManager
+from kivymd.app import MDApp
+
 from controllers.main_controller import MainController
+
+# set window size
+Window.size = (350, 600)
 
 def parse_args():
     p = argparse.ArgumentParser()
@@ -62,22 +71,46 @@ def parse_args():
     
     return p.parse_args()
 
-
-class MyApp(App):
-    def build(self):
+class MyApp(MDApp):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        
+        self.controller = None
+        self.screen_manager = ScreenManager()
         self.preview = Image(fit_mode="contain")
-        return self.preview
-    
+
+    def build(self):
+        self.title = "MimicMotion"
+
+        # Splash screen
+        splash_screen = Builder.load_file("screens/splashscreen.kv")
+        self.screen_manager.add_widget(splash_screen)
+
+        # Camera screen
+        main_screen = Screen(name="MainScreen")
+        main_screen.add_widget(self.preview)
+        self.screen_manager.add_widget(main_screen)
+
+        self.screen_manager.current = "SplashScreen"
+        return self.screen_manager
+
     def on_start(self):
-        # Parse command line arguemnts; initialize main controller and pass arguments
+        # Parse command line arguments; initialize main controller and pass arguments
         args = parse_args()
-        self.controller = MainController(args,preview_widget=self.preview)    
-    
+        self.controller = MainController(args, preview_widget=self.preview)
+        self.screen_manager.current = "SplashScreen"
+
+        # delay the time for the splash screen
+        Clock.schedule_once(self.change_screen, 3)
+
+    def change_screen(self, _dt):
+        self.screen_manager.current = "MainScreen"
+
     def on_stop(self):
         # shutdown main controller
         if self.controller:
             self.controller()
-            self.controller = None 
+            self.controller = None
 
 if __name__ == "__main__":
     MyApp().run()

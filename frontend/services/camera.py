@@ -41,4 +41,3 @@ class Camera:
             self._camera.unbind(on_texture=self._on_texture)
             self._camera.stop()
             self._camera = None
-

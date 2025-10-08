@@ -40,8 +40,8 @@ class MediaPipeCfg:
 
 @dataclass
 class OverlayCfg:
-    pts_color: str = "#00FF00"  # hex and RGB
-    pts_radius: float = 2
+    pts_color: str = "#FF0000"  # hex and RGB
+    pts_radius: float = 4
 
 @dataclass
 class Config:
