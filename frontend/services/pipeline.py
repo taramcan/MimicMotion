@@ -2,85 +2,143 @@
 # Purpose: Processing Pipeline
 # Created: 2025-10-03
 
-from services import nodes
+from __future__ import annotations
+
+import numpy as np
+
+from typing import Optional
+
 from services.config import Config
 from services.landmarks import FaceMeshDetector
+from services.midline import Line2D, Midline
 from services.overlay import Overlay
-from services.midline import Midline
 from kivy.graphics.texture import Texture
 
+
 class Pipeline:
-    def __init__(self, cfg: Config, preview_widget = None):
+    """Orchestrates camera frames, landmark detection, and overlay rendering."""
+
+    def __init__(self, cfg: Config, preview_widget: Optional[Texture] = None):
         self.cfg = cfg
-        self.det = FaceMeshDetector(cfg)
+        self.detector = FaceMeshDetector(cfg)
+        self.midline_helper = Midline(cfg)
         self.overlay = Overlay(cfg, preview_widget) if preview_widget else None
 
-        self.midline = Midline(cfg)
-        self._last_midline = None
+        self._last_landmarks: Optional[np.ndarray] = None
+        self._last_midline: Optional[Line2D] = None
 
-        self.landmarks = None
-        self._last_landmarks = None
+    # ------------------------------------------------------------------ #
+    # Public API
+    # ------------------------------------------------------------------ #
+    def process_frame(self, frame: Texture) -> Optional[Texture]:
+        if frame is None:
+            return None
 
+        landmarks = self._detect_landmarks(frame)
+        display_landmarks = self._mirror_landmarks_if_needed(landmarks)
+        midline, perpendicular = self._compute_midline_overlays(display_landmarks)
 
-    def process_frame(self, frame: Texture):
-        
-        # first few camera frames can be None
-        # guard against that by returning None
-        if frame is None:  return None
+        processed_frame = self._flip_texture_if_needed(frame)
 
-        # Detect face landmarks
-        landmarks = self.det.detect(frame)
+        if self.overlay:
+            instructions = self._build_overlay_instructions(display_landmarks, midline, perpendicular)
+            self.overlay.draw(processed_frame, instructions)
 
-        # If the frame is moving and FaceMeshDetctor returns None
-        # then the system fails. So return to the last good set we had.
+        return processed_frame
+
+    # ------------------------------------------------------------------ #
+    # Landmark handling
+    # ------------------------------------------------------------------ #
+    def _detect_landmarks(self, frame: Texture) -> Optional[np.ndarray]:
+        landmarks = self.detector.detect(frame)
         if landmarks is not None:
             self._last_landmarks = landmarks
-        else:  
-            landmarks = getattr(self,"_last_landmarks",None)
-
-        # display landmarks is what we will display
-        # it's a copy and transformation of landmarks
-        # mirror all x coordinates with 1-x coordinates to flip
-        display_landmarks = landmarks
-        if display_landmarks is not None and self.cfg.camera.hflip:
-            display_landmarks = landmarks.copy()
-            display_landmarks[:,0] = 1.0 - display_landmarks[:,0]
-
-        # calculate midline for later use
-        if display_landmarks is not None:
-            self._last_midline = self.midline.midsagittal_line(display_landmarks)
         else:
+            landmarks = self._last_landmarks
+        return landmarks
+
+    def _mirror_landmarks_if_needed(self, landmarks: Optional[np.ndarray]) -> Optional[np.ndarray]:
+        if landmarks is None or not self.cfg.camera.hflip:
+            return landmarks
+        mirrored = landmarks.copy()
+        mirrored[:, 0] = 1.0 - mirrored[:, 0]
+        return mirrored
+
+    # ------------------------------------------------------------------ #
+    # Midline helpers
+    # ------------------------------------------------------------------ #
+    def _compute_midline_overlays(
+        self,
+        display_landmarks: Optional[np.ndarray],
+    ) -> tuple[Optional[Line2D], Optional[Line2D]]:
+        if display_landmarks is None:
             self._last_midline = None
+            return None, None
 
-        # Apply horizontal flip if configured
-        if self.cfg.camera.hflip:
-            frame = frame.get_region(0, 0, frame.width, frame.height)
-            frame.flip_horizontal()
+        midline = self.midline_helper.midsagittal_line(display_landmarks)
+        self._last_midline = midline
 
-        # process overlay
-        if self.overlay:
-            instructions = None
-            if self.cfg.debug.show_debug and display_landmarks is not None:
-                
-                # build instructions for what we'd want to see
-                # it only actually gets drawing if the "debug" variable
-                # is set to true in the config.
-                instructions = [
-                    {
-                        "draw"      :   "points",
-                        "debug"     :   "landmarks",
-                        "location"  :   display_landmarks,
-                        "color"     :   self.cfg.overlay.pts_color,
-                        "size"      :   self.cfg.overlay.pts_radius
-                    },{
-                        "draw"      :   "line",
-                        "debug"     :   "midline",
-                        "line"      :   self._last_midline,
-                        "color"     :   self.cfg.overlay.midline_color,
-                        "width"     :   self.cfg.overlay.midline_width
-                    }]
-                
-                self.overlay.draw(frame,instructions)
-            else:
-                self.overlay.draw(frame,None)
-        return frame
+        perpendicular = None
+        if midline is not None:
+            nose_tip = display_landmarks[1]  # landmark index 1 is the nose tip
+            perpendicular = self.midline_helper.midsagittal_perpendicular(nose_tip, midline)
+
+        return midline, perpendicular
+
+    # ------------------------------------------------------------------ #
+    # Frame utilities
+    # ------------------------------------------------------------------ #
+    def _flip_texture_if_needed(self, frame: Texture) -> Texture:
+        if not self.cfg.camera.hflip:
+            return frame
+        flipped = frame.get_region(0, 0, frame.width, frame.height)
+        flipped.flip_horizontal()
+        return flipped
+
+    # ------------------------------------------------------------------ #
+    # Overlay construction
+    # ------------------------------------------------------------------ #
+    def _build_overlay_instructions(
+        self,
+        landmarks: Optional[np.ndarray],
+        midline: Optional[Line2D],
+        perpendicular: Optional[Line2D],
+    ) -> Optional[list[dict]]:
+        if not self.cfg.debug.show_debug or landmarks is None:
+            return None
+
+        instructions: list[dict] = [
+            {
+                "draw": "points",
+                "debug": "landmarks",
+                "location": landmarks,
+                "color": self.cfg.overlay.pts_color,
+                "size": self.cfg.overlay.pts_radius,
+            }
+        ]
+
+        if getattr(self.cfg.debug, "midline", True) and midline is not None:
+            instructions.append(
+                {
+                    "draw": "line",
+                    "debug": "midline",
+                    "line": midline,
+                    "slot": 0,
+                    "color": self.cfg.overlay.midline_color,
+                    "width": self.cfg.overlay.midline_width,
+                }
+            )
+
+        if getattr(self.cfg.debug, "midline_perp", True) and perpendicular is not None:
+            instructions.append(
+                {
+                    "draw": "line",
+                    "debug": "midline",
+                    "line": perpendicular,
+                    "slot": 1,
+                    "color": self.cfg.overlay.perp_color,
+                    "width": self.cfg.overlay.perp_width,
+                }
+            )
+
+        return instructions
