@@ -5,11 +5,12 @@ import argparse
 # more robust will be from command line run [$env:KIVY_NO_ARGS='1';python main.py <args>]
 import services.kivy_setup
 
+from kivy.app import App
+from kivy.uix.image import Image
 
 from kivy.core.window import Window
 from kivy.lang import Builder
 from kivy.clock import Clock
-from kivy.uix.image import Image
 from kivy.uix.screenmanager import Screen, ScreenManager
 from kivymd.app import MDApp
 
@@ -19,80 +20,64 @@ from controllers.main_controller import MainController
 Window.size = (350, 600)
 
 def parse_args():
-    parser = argparse.ArgumentParser()
-
+    p = argparse.ArgumentParser()
+    
     # Note: defaults here are the source of truth for default values
 
     # define mode for facial matching
-    parser.add_argument(
-        "--mode",
-        choices=["mirror"],
-        default="mirror",
-        help="Methodology use to display facial matching",
-    )
-
+    p.add_argument('--mode',
+                   choices=["mirror"], 
+                   default = "mirror",
+                   help='Methodology use to display facial matching')
+    
     # flip camera for use with front face vs. world facing camera
-    parser.add_argument(
-        "--hflip",
-        default=False,
-        action="store_true",
-        help="Horizontally flip camera for selfie view",
-    )
+    p.add_argument('--hflip',
+                   default=True,
+                   action="store_false",
+                   help='Horizontally flip camera for selfie view')
 
     # runtime settings
-    parser.add_argument(
-        "--droopy",
-        choices=["left", "right"],
-        default="left",
-        help="Which side of the face is droopy",
-    )
+    p.add_argument('--droopy',
+                    choices=['left','right'],
+                    default='left',
+                    help="Anatomatomically, which side of the face is droopy")
 
     # run in debug mode?
-    parser.add_argument(
-        "--debug",
-        default=False,
-        action="store_true",
-        help="Show debug information",
-    )
-
+    p.add_argument('--debug', 
+                   default=False,
+                   action='store_true',
+                   help='Show debug information')
+    
     # camera settings
-    parser.add_argument(
-        "--camera_index",
-        type=int,
-        default=0,
-        help="Camera index to use",
-    )
-
-    parser.add_argument(
-        "--camera_width",
-        type=int,
-        default=640,
-        help="Camera width resolution",
-    )
-
-    parser.add_argument(
-        "--camera_height",
-        type=int,
-        default=420,
-        help="Camera height resolution",
-    )
-
-    parser.add_argument(
-        "--camera_fps",
-        type=int,
-        default=30,
-        help="Camera frames per second",
-    )
-
-    return parser.parse_args()
-
+    p.add_argument('--camera_index', 
+                   type=int,
+                   default=0,
+                   help='Camera index to use')  
+      
+    p.add_argument('--camera_width', 
+                   type=int,
+                   default=1280,
+                   help='Camera width resolution')
+    
+    p.add_argument('--camera_height', 
+                   type=int,
+                   default=720,
+                   help='Camera height resolution')
+    
+    p.add_argument('--camera_fps',
+                   type=int,
+                   default=60,
+                   help='Camera frames per second')
+    
+    return p.parse_args()
 
 class MyApp(MDApp):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        
         self.controller = None
         self.screen_manager = ScreenManager()
-        self.preview = Image(allow_stretch=True, keep_ratio=True)
+        self.preview = Image(fit_mode="contain")
 
     def build(self):
         self.title = "MimicMotion"
@@ -126,7 +111,6 @@ class MyApp(MDApp):
         if self.controller:
             self.controller()
             self.controller = None
-
 
 if __name__ == "__main__":
     MyApp().run()

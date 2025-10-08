@@ -30,7 +30,7 @@ def MainController(args, preview_widget=None):
     # Build configuration from command line arguments
     cfg = build_config(args)
 
-    # Initialize Pipeline and Camera with configuration
+    # Initialize Pipeline, Camera, and Overlay with configuration
     pipe = Pipeline(cfg)
     cam = Camera(cfg)
 
@@ -41,7 +41,14 @@ def MainController(args, preview_widget=None):
         
         # Refresh function to update the preview widget with the latest camera frame (coat room contents)
         def _refresh(dt):
+            
+            # grab a frame from the camera
             texture = cam.read()
+
+            # process the frame through the pipeline
+            if texture is not None:
+                texture = pipe.process_frame(texture)
+
             if texture is None:
                 return
             preview_widget.texture = texture

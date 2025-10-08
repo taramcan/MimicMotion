@@ -25,9 +25,9 @@ class Camera:
         texture = instance.texture
         if not texture:
             return
-        if self._hflip:
-            texture = texture.get_region(0, 0, texture.width, texture.height)
-            texture.flip_horizontal()
+        # if self._hflip:
+        #     texture = texture.get_region(0, 0, texture.width, texture.height)
+        #     texture.flip_horizontal()
         self._latest_texture = texture
 
     def start(self):
