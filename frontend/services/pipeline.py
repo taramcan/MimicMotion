@@ -2,10 +2,10 @@
 # Purpose: Processing Pipeline
 # Created: 2025-10-03
 
-from src import nodes
-from src.config import Config
-from src.landmarks import FaceMeshDetector
-from src.overlay import Overlay
+from services import nodes
+from services.config import Config
+from services.landmarks import FaceMeshDetector
+from services.overlay import Overlay
 from kivy.graphics.texture import Texture
 
 class Pipeline:

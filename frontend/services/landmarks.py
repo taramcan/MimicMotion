@@ -6,8 +6,8 @@ import mediapipe as mp
 import numpy as np
 from kivy.graphics.texture import Texture
 
-from src.config import Config
-from src import nodes
+from services.config import Config
+from services import nodes
 
 class FaceMeshDetector():
     def __init__(self, cfg:Config):

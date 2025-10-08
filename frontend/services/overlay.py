@@ -3,7 +3,7 @@
 # Created: 2025-10-06
 
 import numpy as np
-from src.config import Config
+from services.config import Config
 from kivy.graphics.texture import Texture
 from kivy.graphics import Fbo, ClearColor, ClearBuffers, Color, Ellipse, Rectangle
 from kivy.utils import get_color_from_hex
