@@ -9,10 +9,10 @@ from services.overlay import Overlay
 from kivy.graphics.texture import Texture
 
 class Pipeline:
-    def __init__(self, cfg: Config):
+    def __init__(self, cfg: Config, preview_widget = None):
         self.cfg = cfg
         self.det = FaceMeshDetector(cfg)
-        if self.cfg.debug.show_debug: self.overlay = Overlay(cfg)
+        self.overlay = Overlay(cfg, preview_widget) if preview_widget else None
 
 
     def process_frame(self, frame: Texture):
@@ -31,20 +31,28 @@ class Pipeline:
         else:  
             landmarks = getattr(self,"_last_landmarks",None)
 
-        # process overlay
-        if self.cfg.debug.show_debug and landmarks is not None:
-            instructions = [{
-                "draw"      :   "points",
-                "debug"     :   "landmarks",
-                "location"  :   landmarks,
-                "color"     :   self.cfg.overlay.pts_color,
-                "size"      :   self.cfg.overlay.pts_radius
-            }]
-            frame = self.overlay.draw(frame,instructions)
+        display_landmarks = landmarks
+        if display_landmarks is not None and self.cfg.camera.hflip:
+            display_landmarks = landmarks.copy()
+            display_landmarks[:,0] = 1.0 - display_landmarks[:,0]
 
         # Apply horizontal flip if configured
         if self.cfg.camera.hflip:
             frame = frame.get_region(0, 0, frame.width, frame.height)
             frame.flip_horizontal()
 
+        # process overlay
+        if self.overlay:
+            instructions = None
+            if self.cfg.debug.show_debug and display_landmarks is not None:
+                instructions = [{
+                    "draw"      :   "points",
+                    "debug"     :   "landmarks",
+                    "location"  :   display_landmarks,
+                    "color"     :   self.cfg.overlay.pts_color,
+                    "size"      :   self.cfg.overlay.pts_radius
+                }]
+                self.overlay.draw(frame,instructions)
+            else:
+                self.overlay.draw(frame,None)
         return frame
