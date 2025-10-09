@@ -2,10 +2,19 @@
 # Purpose: Configuration settings for MimicMotion application
 # Created: 2025-10-03
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
+from services import nodes
 
 # Note: The source of truth for configurable default values is in the argument parsers
 #       The source of truth for non-configurable default values is in the dataclass definitions
+
+def _default_nodes():
+    # left = nodes.FACE & nodes.LEFT_LANDMARKS
+    display = sorted(nodes.MIDLINE_LANDMARKS)
+    return [display]
+
 
 @ dataclass
 class DebugCfg:
@@ -16,6 +25,8 @@ class DebugCfg:
     landmarks       :   bool = True
     midline         :   bool = True
     perpendicular   :   bool = True
+    regions         :   bool = False
+
 
 @ dataclass
 class RuntimeCfg:
@@ -50,6 +61,10 @@ class OverlayCfg:
     perp_color      : str = "#FF00FF"
     perp_width      : float = 1.5
 
+    region_color    : str = "#FFFF00"
+    region_width    : float = 1.2
+    region_nodes    : list[list[str]] = field(default_factory=_default_nodes)
+
 @dataclass
 class Config:
     runtime: RuntimeCfg = field(default_factory=RuntimeCfg)
@@ -57,3 +72,5 @@ class Config:
     debug: DebugCfg = field(default_factory=DebugCfg)
     mp: MediaPipeCfg = field(default_factory=MediaPipeCfg)
     overlay: OverlayCfg = field(default_factory=OverlayCfg)
+
+

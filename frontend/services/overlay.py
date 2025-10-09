@@ -35,6 +35,7 @@ class Overlay:
         self._layers = {
             "points": self._draw_points,
             "line": self._draw_line,
+            "polygon": self._draw_polygon,
         }
 
         # Points
@@ -48,6 +49,13 @@ class Overlay:
         self._line_segments: list[Line] = []
         self._line_slots_used: set[int] = set()
 
+        # Polygons (closed outlines)
+        self._poly_group: InstructionGroup | None = None
+        self._poly_colors: list[Color] = []
+        self._poly_segments: list[Line] = []
+        self._poly_slots_used: set[int] = set()
+        self._poly_next_slot: int = 0
+
     # ------------------------------------------------------------------ #
     # Public API
     # ------------------------------------------------------------------ #
@@ -59,9 +67,12 @@ class Overlay:
         ):
             self._clear_points()
             self._clear_lines()
+            self._clear_polygons()
             return frame
 
         self._line_slots_used.clear()
+        self._poly_slots_used.clear()
+        self._poly_next_slot = 0
         rendered = False
         items = instructions if isinstance(instructions, (list, tuple)) else [instructions]
 
@@ -76,8 +87,10 @@ class Overlay:
         if not rendered:
             self._clear_points()
             self._clear_lines()
+            self._clear_polygons()
         else:
             self._clear_unused_lines()
+            self._clear_unused_polygons()
 
         return frame
 
@@ -150,6 +163,88 @@ class Overlay:
             self._point_color.rgba = (r, g, b, 0)
         for ell in self._point_ellipses:
             ell.size = (0, 0)
+
+    # ------------------------------------------------------------------ #
+    # Polygon layer
+    # ------------------------------------------------------------------ #
+    def _draw_polygon(self, frame: Texture, overlay: dict) -> Texture:
+        if not self.preview:
+            self._clear_polygons()
+            return frame
+
+        points = overlay.get("points")
+        if points is None or len(points) < 3:
+            return frame
+
+        pts = np.asarray(points, dtype=np.float32)
+        color = _resolve_color(overlay.get("color"), self.cfg.overlay.region_color)
+        width = float(overlay.get("width", self.cfg.overlay.region_width))
+
+        widget_h, widget_w = self.preview.height, self.preview.width
+        tex_h, tex_w = frame.height, frame.width
+        if widget_w == 0 or widget_h == 0 or tex_w == 0 or tex_h == 0:
+            return frame
+
+        scale = min(widget_w / tex_w, widget_h / tex_h)
+        display_w = tex_w * scale
+        display_h = tex_h * scale
+        offset_x = (widget_w - display_w) / 2.0
+        offset_y = (widget_h - display_h) / 2.0
+
+        coords: list[float] = []
+        for x_norm, y_norm in pts:
+            x_px = offset_x + x_norm * display_w
+            y_px = offset_y + (1.0 - y_norm) * display_h
+            coords.extend([x_px, y_px])
+
+        slot_value = overlay.get("slot")
+        if slot_value is None:
+            slot = self._poly_next_slot
+            self._poly_next_slot += 1
+        else:
+            slot = int(slot_value)
+
+        self._ensure_polygon_primitives(slot + 1)
+        color_instr = self._poly_colors[slot]
+        seg = self._poly_segments[slot]
+
+        color_instr.rgba = color
+        seg.points = coords
+        seg.width = width
+
+        self._poly_slots_used.add(slot)
+        return frame
+
+    def _ensure_polygon_primitives(self, count: int) -> None:
+        if self._canvas is None and self.preview:
+            self._canvas = self.preview.canvas.after
+        if self._canvas is None:
+            return
+
+        if self._poly_group is None:
+            self._poly_group = InstructionGroup()
+            self._canvas.add(self._poly_group)
+
+        while len(self._poly_segments) < count:
+            color_instr = Color(0, 0, 0, 0)
+            line_instr = Line(points=[], width=0, close=True, joint="round")
+            self._poly_group.add(color_instr)
+            self._poly_group.add(line_instr)
+            self._poly_colors.append(color_instr)
+            self._poly_segments.append(line_instr)
+
+    def _clear_polygons(self) -> None:
+        for color_instr in self._poly_colors:
+            r, g, b, _ = color_instr.rgba
+            color_instr.rgba = (r, g, b, 0)
+        for seg in self._poly_segments:
+            seg.points = []
+
+    def _clear_unused_polygons(self) -> None:
+        for idx, seg in enumerate(self._poly_segments):
+            if idx not in self._poly_slots_used:
+                self._poly_colors[idx].rgba = (*self._poly_colors[idx].rgba[:3], 0)
+                seg.points = []
 
     # ------------------------------------------------------------------ #
     # Line layer
@@ -281,3 +376,4 @@ def _resolve_color(value: str | tuple | list, fallback) -> tuple[float, float, f
             alpha = value[3] if len(value) == 4 else 1.0
         return (*rgb, alpha)
     return get_color_from_hex(fallback)
+

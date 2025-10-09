@@ -8,11 +8,47 @@ import numpy as np
 
 from typing import Optional
 
+from services import nodes
 from services.config import Config
 from services.landmarks import FaceMeshDetector
 from services.midline import Line2D, Midline
 from services.overlay import Overlay
 from kivy.graphics.texture import Texture
+
+
+def _convex_hull(points: np.ndarray) -> Optional[np.ndarray]:
+    """Return the convex hull of the provided 2D points in CCW order."""
+    if points is None:
+        return None
+
+    pts = np.asarray(points, dtype=np.float32)
+    if pts.size == 0:
+        return None
+
+    pts = np.unique(pts, axis=0)
+    if pts.shape[0] < 3:
+        return None
+
+    order = np.lexsort((pts[:, 1], pts[:, 0]))
+    pts = pts[order]
+
+    def cross(o: np.ndarray, a: np.ndarray, b: np.ndarray) -> float:
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+
+    lower: list[np.ndarray] = []
+    for p in pts:
+        while len(lower) >= 2 and cross(lower[-2], lower[-1], p) <= 0:
+            lower.pop()
+        lower.append(p)
+
+    upper: list[np.ndarray] = []
+    for p in reversed(pts):
+        while len(upper) >= 2 and cross(upper[-2], upper[-1], p) <= 0:
+            upper.pop()
+        upper.append(p)
+
+    hull = np.array(lower[:-1] + upper[:-1], dtype=np.float32)
+    return hull if hull.shape[0] >= 3 else None
 
 
 class Pipeline:
@@ -23,6 +59,21 @@ class Pipeline:
         self.detector = FaceMeshDetector(cfg)
         self.midline_helper = Midline(cfg)
         self.overlay = Overlay(cfg, preview_widget) if preview_widget else None
+
+        self._region_groups: list[tuple[tuple[str, ...], list[int]]] = []
+        for raw_path in (cfg.overlay.region_nodes or []):
+            path_tuple = tuple(raw_path)
+            if path_tuple and path_tuple[0] == "face":
+                path_tuple = path_tuple[1:]
+            if not path_tuple:
+                continue
+            try:
+                indices = sorted(nodes.get_indices(("face",) + path_tuple))
+            except KeyError:
+                continue
+            if len(indices) < 3:
+                continue
+            self._region_groups.append((path_tuple, indices))
 
         self._last_landmarks: Optional[np.ndarray] = None
         self._last_midline: Optional[Line2D] = None
@@ -95,6 +146,33 @@ class Pipeline:
         flipped.flip_horizontal()
         return flipped
 
+    def _region_polygons(self, landmarks: Optional[np.ndarray]) -> list[dict]:
+        if (
+            landmarks is None
+            or not getattr(self.cfg.debug, "regions", False)
+            or not self._region_groups
+        ):
+            return []
+
+        overlays: list[dict] = []
+        for path, indices in self._region_groups:
+            region_pts = landmarks[indices]
+            hull = _convex_hull(region_pts)
+            if hull is None:
+                continue
+
+            overlays.append(
+                {
+                    "draw": "polygon",
+                    "debug": "regions",
+                    "points": hull,
+                    "color": self.cfg.overlay.region_color,
+                    "width": self.cfg.overlay.region_width,
+                }
+            )
+
+        return overlays
+
     # ------------------------------------------------------------------ #
     # Overlay construction
     # ------------------------------------------------------------------ #
@@ -141,4 +219,8 @@ class Pipeline:
                 }
             )
 
+        instructions.extend(self._region_polygons(landmarks))
+
         return instructions
+
+
