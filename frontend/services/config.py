@@ -10,10 +10,17 @@ from services import nodes
 # Note: The source of truth for configurable default values is in the argument parsers
 #       The source of truth for non-configurable default values is in the dataclass definitions
 
-def _default_nodes():
-    # left = nodes.FACE & nodes.LEFT_LANDMARKS
-    display = sorted(nodes.MIDLINE_LANDMARKS)
-    return [display]
+def _default_nodes() -> list[dict]:
+    left = nodes.get_indices(("face", "sides", "left"))
+    mid = nodes.get_indices(("face", "midline"))
+    union_indices = sorted(left | mid)
+
+    return [
+        {
+            "name": "left_with_midline",
+            "indices": union_indices,
+        }
+    ]
 
 
 @ dataclass
@@ -22,10 +29,10 @@ class DebugCfg:
     # current functionality: all debugs are on or off
     # if show_debug is flagged, then everything else defaults to True
     show_debug      :   bool |  None = None 
-    landmarks       :   bool = True
-    midline         :   bool = True
+    landmarks       :   bool = False
+    midline         :   bool  = False
     perpendicular   :   bool = True
-    regions         :   bool = False
+    regions         :   bool = True
 
 
 @ dataclass

@@ -15,6 +15,9 @@ from services.midline import Line2D, Midline
 from services.overlay import Overlay
 from kivy.graphics.texture import Texture
 
+# Flip map to properly map debugging points
+FLIP_MAP = {l: r for l, r in nodes.LEFT_RIGHT_PAIRS}
+FLIP_MAP.update({r: l for l, r in nodes.LEFT_RIGHT_PAIRS})
 
 def _convex_hull(points: np.ndarray) -> Optional[np.ndarray]:
     """Return the convex hull of the provided 2D points in CCW order."""
@@ -60,20 +63,32 @@ class Pipeline:
         self.midline_helper = Midline(cfg)
         self.overlay = Overlay(cfg, preview_widget) if preview_widget else None
 
-        self._region_groups: list[tuple[tuple[str, ...], list[int]]] = []
-        for raw_path in (cfg.overlay.region_nodes or []):
-            path_tuple = tuple(raw_path)
-            if path_tuple and path_tuple[0] == "face":
-                path_tuple = path_tuple[1:]
-            if not path_tuple:
-                continue
-            try:
-                indices = sorted(nodes.get_indices(("face",) + path_tuple))
-            except KeyError:
-                continue
+        self._region_groups: list[tuple[str, list[int]]] = []
+
+        for raw in (cfg.overlay.region_nodes or []):
+            if isinstance(raw, dict) and "indices" in raw:
+                name = raw.get("name", "custom")
+                indices = list(raw["indices"])
+            else:
+                path = tuple(raw)
+                if path and path[0] == "face":
+                    path = path[1:]
+                if not path:
+                    continue
+                try:
+                    indices = sorted(nodes.get_indices(("face",) + path))
+                except KeyError:
+                    continue
+                name = "/".join(("face",) + path)
+
+            if self.cfg.camera.hflip:
+                indices = sorted(FLIP_MAP.get(idx, idx) for idx in indices)
+
             if len(indices) < 3:
                 continue
-            self._region_groups.append((path_tuple, indices))
+
+            self._region_groups.append((name, indices))
+
 
         self._last_landmarks: Optional[np.ndarray] = None
         self._last_midline: Optional[Line2D] = None
@@ -211,7 +226,7 @@ class Pipeline:
             instructions.append(
                 {
                     "draw": "line",
-                    "debug": "midline",
+                    "debug": "perpendicular",
                     "line": perpendicular,
                     "slot": 1,
                     "color": self.cfg.overlay.perp_color,
@@ -222,5 +237,6 @@ class Pipeline:
         instructions.extend(self._region_polygons(landmarks))
 
         return instructions
+
 
 
