@@ -7,11 +7,13 @@ import services.kivy_setup
 
 from kivy.app import App
 from kivy.uix.image import Image
+from kivy.uix.floatlayout import FloatLayout
+from kivy.factory import Factory
 
 from kivy.core.window import Window
 from kivy.lang import Builder
 from kivy.clock import Clock
-from kivy.uix.screenmanager import Screen, ScreenManager
+from kivy.uix.screenmanager import ScreenManager
 from kivymd.app import MDApp
 
 from controllers.main_controller import MainController
@@ -78,10 +80,16 @@ class MyApp(MDApp):
         self.controller = None
         self.screen_manager = ScreenManager()
         self.preview = Image(fit_mode="contain")
+        self.preview.size_hint = (1, 1)
+        self.preview.allow_stretch = True
+        self.preview.keep_ratio = True
+        self.preview.pos_hint = {"center_x": 0.5, "center_y": 0.5}
+        self.bottom_nav = None
 
     def build(self):
         self.title = "MimicMotion"
         Builder.load_file("screens/bottombar.kv")
+        root = FloatLayout()
 
         # Splash screen
         splash_screen = Builder.load_file("screens/splashscreen.kv")
@@ -100,9 +108,15 @@ class MyApp(MDApp):
         progress_screen = Builder.load_file("screens/progressscreen.kv")
         self.screen_manager.add_widget(progress_screen)
 
+        root.add_widget(self.screen_manager)
+        bottom_nav = Factory.BottomNavBar()
+        bottom_nav.size_hint = (1, None)
+        bottom_nav.pos_hint = {"x": 0, "y": 0}
+        root.add_widget(bottom_nav)
+        self.bottom_nav = bottom_nav  # keep reference if needed
 
         self.screen_manager.current = "SplashScreen"
-        return self.screen_manager
+        return root
 
     def on_start(self):
         # Parse command line arguments; initialize main controller and pass arguments
