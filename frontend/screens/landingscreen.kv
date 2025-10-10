@@ -1,0 +1,38 @@
+MDNavigationLayout:
+    ScreenManager:
+        MDScreen:
+            MDTopAppBar:
+                title: "Menu Page"
+                elevation: 4
+                pos_hint: {"top": 1}
+                left_action_items: [["menu", lambda x: nav_drawer.set_state("open")]]
+
+            MDLabel:
+                text: "Welcome to the Main Screen!"
+                halign: "center"
+
+    MDNavigationDrawer:
+        id: nav_drawer
+        MDNavigationDrawerHeader:
+            title: "App Menu"
+            text: "User Name"
+            source: "path/to/your/profile_image.png" # Optional: Add a profile image
+            spacing: "4dp"
+            padding: "12dp", 0, 0, "12dp"
+
+        MDNavigationDrawerItem:
+            text: "Camera"
+            icon: "home"
+            on_release: app.navigate_to_screen("CameraScreen")
+
+        MDNavigationDrawerItem:
+            text: "Settings"
+            icon: "cog"
+            on_release: app.navigate_to_screen("settings_screen")
+
+        MDNavigationDrawerDivider:
+
+        MDNavigationDrawerItem:
+            text: "Progress"
+            icon: "information"
+            on_release: app.navigate_to_screen("about_screen")

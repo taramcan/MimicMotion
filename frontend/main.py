@@ -16,9 +16,6 @@ from kivymd.app import MDApp
 
 from controllers.main_controller import MainController
 
-# set window size
-Window.size = (350, 600)
-
 def parse_args():
     p = argparse.ArgumentParser()
     
@@ -74,6 +71,9 @@ def parse_args():
 class MyApp(MDApp):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+
+        # set window size
+        Window.size = (350, 600)
         
         self.controller = None
         self.screen_manager = ScreenManager()
@@ -86,10 +86,15 @@ class MyApp(MDApp):
         splash_screen = Builder.load_file("screens/splashscreen.kv")
         self.screen_manager.add_widget(splash_screen)
 
+        #landing page
+        landing_screen = Builder.load_file("screens/landingscreen.kv")
+        self.screen_manager.add_widget(landing_screen)
+        
         # Camera screen
-        main_screen = Screen(name="MainScreen")
-        main_screen.add_widget(self.preview)
-        self.screen_manager.add_widget(main_screen)
+        camera_screen = Screen(name="CameraScreen")
+        camera_screen.add_widget(self.preview)
+        self.screen_manager.add_widget(camera_screen)
+
 
         self.screen_manager.current = "SplashScreen"
         return self.screen_manager
@@ -104,7 +109,7 @@ class MyApp(MDApp):
         Clock.schedule_once(self.change_screen, 3)
 
     def change_screen(self, _dt):
-        self.screen_manager.current = "MainScreen"
+        self.screen_manager.current = "LandingScreen"
 
     def on_stop(self):
         # shutdown main controller
