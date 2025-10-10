@@ -81,19 +81,24 @@ class MyApp(MDApp):
 
     def build(self):
         self.title = "MimicMotion"
+        Builder.load_file("screens/bottombar.kv")
 
         # Splash screen
         splash_screen = Builder.load_file("screens/splashscreen.kv")
         self.screen_manager.add_widget(splash_screen)
 
-        #landing page
+        # Landing page
         landing_screen = Builder.load_file("screens/landingscreen.kv")
         self.screen_manager.add_widget(landing_screen)
-        
+
         # Camera screen
-        camera_screen = Screen(name="CameraScreen")
-        camera_screen.add_widget(self.preview)
+        camera_screen = Builder.load_file("screens/camerascreen.kv")
+        camera_screen.ids.preview_container.add_widget(self.preview)
         self.screen_manager.add_widget(camera_screen)
+
+        # Progress screen
+        progress_screen = Builder.load_file("screens/progressscreen.kv")
+        self.screen_manager.add_widget(progress_screen)
 
 
         self.screen_manager.current = "SplashScreen"
@@ -104,12 +109,19 @@ class MyApp(MDApp):
         args = parse_args()
         self.controller = MainController(args, preview_widget=self.preview)
         self.screen_manager.current = "SplashScreen"
+        
 
         # delay the time for the splash screen
-        Clock.schedule_once(self.change_screen, 3)
+        Clock.schedule_once(self.go_to_landing, 3)
 
-    def change_screen(self, _dt):
+    def go_to_landing(self, *_dt):
         self.screen_manager.current = "LandingScreen"
+
+    def go_to_camera(self):
+        self.screen_manager.current = "CameraScreen"
+
+    def go_to_progress(self):
+        self.screen_manager.current = "ProgressScreen"
 
     def on_stop(self):
         # shutdown main controller
