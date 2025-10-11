@@ -7,3 +7,5 @@ __pycache__/
 
 # Local requirement snapshots
 requirements.txt
+__pycache__/
+*.pyc
