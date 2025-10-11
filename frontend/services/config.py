@@ -2,18 +2,38 @@
 # Purpose: Configuration settings for MimicMotion application
 # Created: 2025-10-03
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
+from services import nodes
 
 # Note: The source of truth for configurable default values is in the argument parsers
 #       The source of truth for non-configurable default values is in the dataclass definitions
+
+def _default_nodes() -> list[dict]:
+    left = nodes.get_indices(("face", "sides", "left"))
+    mid = nodes.get_indices(("face", "midline"))
+    union_indices = sorted(left | mid)
+
+    return [
+        {
+            "name": "left_with_midline",
+            "indices": union_indices,
+        }
+    ]
+
 
 @ dataclass
 class DebugCfg:
     
     # current functionality: all debugs are on or off
     # if show_debug is flagged, then everything else defaults to True
-    show_debug: bool |  None = None 
-    landmarks: bool = True
+    show_debug      :   bool |  None = None 
+    landmarks       :   bool = False
+    midline         :   bool  = False
+    perpendicular   :   bool = True
+    regions         :   bool = True
+
 
 @ dataclass
 class RuntimeCfg:
@@ -39,8 +59,18 @@ class MediaPipeCfg:
 
 @dataclass
 class OverlayCfg:
-    pts_color: str = "#00FF00"  # hex and RGB
-    pts_radius: float = 0.5
+    pts_color       : str = "#00FF00"  # hex and RGB
+    pts_radius      : float = 0.5
+
+    midline_color   : str = "#0000FF"
+    midline_width   : float = 1.0
+
+    perp_color      : str = "#FF00FF"
+    perp_width      : float = 1.5
+
+    region_color    : str = "#FFFF00"
+    region_width    : float = 1.2
+    region_nodes    : list[list[str]] = field(default_factory=_default_nodes)
 
 @dataclass
 class Config:
@@ -49,3 +79,5 @@ class Config:
     debug: DebugCfg = field(default_factory=DebugCfg)
     mp: MediaPipeCfg = field(default_factory=MediaPipeCfg)
     overlay: OverlayCfg = field(default_factory=OverlayCfg)
+
+
