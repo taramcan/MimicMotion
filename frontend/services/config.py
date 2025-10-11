@@ -29,9 +29,9 @@ class DebugCfg:
     # current functionality: all debugs are on or off
     # if show_debug is flagged, then everything else defaults to True
     show_debug      :   bool |  None = None 
-    landmarks       :   bool = False
+    landmarks       :   bool = True
     midline         :   bool  = False
-    perpendicular   :   bool = True
+    perpendicular   :   bool = False
     regions         :   bool = True
 
 
