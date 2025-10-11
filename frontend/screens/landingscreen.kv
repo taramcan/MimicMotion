@@ -9,3 +9,27 @@ MDScreen:
             MDLabel:
                 text: "Welcome to MimicMotion"
                 halign: "center"
+                valign: "middle"
+            MDLabel:
+                id: user_name
+                halign: "center"
+                valign: "middle"
+                text: "Enter your name"
+            TextInput:
+                id: name_input
+                multiline: False
+                size_hint: (1, 0.5)
+            Button:
+                size_hint: (1, 0.5)
+                font_size: 32
+                text: "Submit Name"
+                on_press: app.submit_name()
+            Button:
+                size_hint: (1, 0.5)
+                font_size: 32
+                text: "Show Records"
+                on_press: app.show_records()
+            MDLabel:
+                id: welcome_message
+                halign: "center"
+                valign: "middle"

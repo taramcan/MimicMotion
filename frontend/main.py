@@ -17,6 +17,7 @@ from kivy.uix.screenmanager import ScreenManager
 from kivymd.app import MDApp
 
 from controllers.main_controller import MainController
+from services import db
 
 def parse_args():
     p = argparse.ArgumentParser()
@@ -88,6 +89,8 @@ class MyApp(MDApp):
 
     def build(self):
         self.title = "MimicMotion"
+        services.db.init_db()
+        
         Builder.load_file("screens/bottombar.kv")
         root = FloatLayout()
 
@@ -142,6 +145,12 @@ class MyApp(MDApp):
         if self.controller:
             self.controller()
             self.controller = None
+
+    def submit_name(self):
+        landing = self.screen_manager.get_screen("LandingScreen")
+        name = landing.ids.name_input.text
+        db.submit(name)
+
 
 if __name__ == "__main__":
     MyApp().run()
