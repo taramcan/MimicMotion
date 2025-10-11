@@ -1,5 +1,5 @@
 MDScreen:
-    name: "LandingScreen"
+    name: "SignUpScreen"
     MDBoxLayout:
         MDBoxLayout:
             orientation: "vertical"
@@ -10,21 +10,21 @@ MDScreen:
                 source: 'assets/logo.png'
                 allow_stretch: True
             MDLabel:
-                id: user_name
+                id: choose_user_name
                 halign: "center"
                 valign: "middle"
-                text: "Enter your user name"
+                text: "Enter your email address"
             TextInput:
-                id: username_input
+                id: chosen_username_input
                 multiline: False
                 size_hint: (1, 0.5)
             MDLabel:
-                id: pw
+                id: choose_pw
                 halign: "center"
                 valign: "middle"
-                text: "Enter password"
+                text: "Choose a password"
             TextInput:
-                id: pw_input
+                id: chosen_pw_input
                 multiline: False
                 size_hint: (1, 0.5)
             Button:
@@ -32,13 +32,3 @@ MDScreen:
                 font_size: 32
                 text: "Sign in"
                 on_press: app.sign_in()
-            MDLabel:
-                id: sign_up
-                halign: "center"
-                valign: "middle"
-                text: "Don't have an account?"
-            Button:
-                size_hint: (1, 0.5)
-                font_size: 32
-                text: "Sign Up"
-                on_press: app.sign_up()

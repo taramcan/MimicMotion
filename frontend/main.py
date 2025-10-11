@@ -16,6 +16,8 @@ from kivy.clock import Clock
 from kivy.uix.screenmanager import ScreenManager
 from kivymd.app import MDApp
 
+from pathlib import Path
+
 from controllers.main_controller import MainController
 from services import db
 
@@ -89,8 +91,12 @@ class MyApp(MDApp):
 
     def build(self):
         self.title = "MimicMotion"
-        services.db.init_db()
-        
+        # TODO: restore use of App.get_running_app().user_data_dir before shipping.
+        # user_data_dir = App.get_running_app().user_data_dir
+        # db_path = os.path.join(user_data_dir, "mydb.db")
+        db_path = Path(__file__).resolve().parent / "mydb.db"
+        db.init_db(db_path)
+
         Builder.load_file("screens/bottombar.kv")
         root = FloatLayout()
 
@@ -101,6 +107,10 @@ class MyApp(MDApp):
         # Landing page
         landing_screen = Builder.load_file("screens/landingscreen.kv")
         self.screen_manager.add_widget(landing_screen)
+
+        #signup screen
+        signup_screen = Builder.load_file("screens/signupscreen.kv")
+        self.screen_manager.add_widget(signup_screen)
 
         # Camera screen
         camera_screen = Builder.load_file("screens/camerascreen.kv")
@@ -146,10 +156,18 @@ class MyApp(MDApp):
             self.controller()
             self.controller = None
 
-    def submit_name(self):
+    def sign_in(self):
         landing = self.screen_manager.get_screen("LandingScreen")
-        name = landing.ids.name_input.text
-        db.submit(name)
+        # TODO: restore use of App.get_running_app().user_data_dir before shipping.
+        # user_data_dir = App.get_running_app().user_data_dir
+        # db_path = os.path.join(user_data_dir, "mydb.db")
+        db_path = Path(__file__).resolve().parent / "mydb.db"
+        username = landing.ids.username_input.text
+        pw = landing.ids.pw_input.text
+        db.sign_in(db_path, username, pw)
+    
+    def sign_up(self):
+        self.screen_manager.current = "SignUpScreen"
 
 
 if __name__ == "__main__":
