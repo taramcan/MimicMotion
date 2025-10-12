@@ -7,5 +7,14 @@ MDScreen:
             orientation: "vertical"
             size_hint_y: 1
             MDLabel:
-                text: "Profile Placeholder"
+                text: "Name"
                 halign: 'center'
+            MDLabel:
+                text: "Email"
+                halign: 'center'
+
+            Button:
+                text: 'Edit Profile'
+                size_hint_y: None
+                height: 50
+                on_press: root.edit_profile()
