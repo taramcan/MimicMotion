@@ -1,9 +1,6 @@
 absl-py==2.1.0
 attrs==25.4.0
-<<<<<<< Updated upstream
-=======
 bcrypt @ file:///C:/b/abs_b3ok3jhxrx/croot/bcrypt_1747402791004/work
->>>>>>> Stashed changes
 certifi==2025.10.5
 cffi==2.0.0
 charset-normalizer==3.4.3
