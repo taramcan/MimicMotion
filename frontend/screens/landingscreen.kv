@@ -1,0 +1,44 @@
+MDScreen:
+    name: "LandingScreen"
+    MDBoxLayout:
+        MDBoxLayout:
+            orientation: "vertical"
+            padding: [100, 100, 100, dp(88)]
+            orientation: "vertical"
+            size_hint_y: 1
+            Image:
+                source: 'assets/logo.png'
+                allow_stretch: True
+            MDLabel:
+                id: user_name
+                halign: "center"
+                valign: "middle"
+                text: "Enter your user name"
+            TextInput:
+                id: username_input
+                multiline: False
+                size_hint: (1, 0.5)
+            MDLabel:
+                id: pw
+                halign: "center"
+                valign: "middle"
+                text: "Enter password"
+            TextInput:
+                id: pw_input
+                multiline: False
+                size_hint: (1, 0.5)
+            Button:
+                size_hint: (1, 0.5)
+                font_size: 32
+                text: "Sign in"
+                on_press: app.sign_in()
+            MDLabel:
+                id: sign_up
+                halign: "center"
+                valign: "middle"
+                text: "Don't have an account?"
+            Button:
+                size_hint: (1, 0.5)
+                font_size: 32
+                text: "Sign Up"
+                on_press: app.sign_up()

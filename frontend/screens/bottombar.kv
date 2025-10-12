@@ -1,0 +1,45 @@
+<BottomNavBar@MDBoxLayout>:
+    size_hint_x: 1
+    size_hint_y: None
+    height: "72dp"
+    padding: "12dp"
+    spacing: "32dp"
+
+    MDBoxLayout:
+        orientation: "vertical"
+        spacing: "4dp"
+        adaptive_height: True
+        MDIconButton:
+            icon: "home"
+            pos_hint: {"center_x": 0.5}
+            on_release: app.go_to_landing()
+        MDLabel:
+            text: "Home"
+            halign: "center"
+            theme_text_color: "Secondary"
+
+    MDBoxLayout:
+        orientation: "vertical"
+        spacing: "4dp"
+        adaptive_height: True
+        MDIconButton:
+            icon: "camera"
+            pos_hint: {"center_x": 0.5}
+            on_release: app.go_to_camera()
+        MDLabel:
+            text: "Camera"
+            halign: "center"
+            theme_text_color: "Secondary"
+
+    MDBoxLayout:
+        orientation: "vertical"
+        spacing: "4dp"
+        adaptive_height: True
+        MDIconButton:
+            icon: "file-chart"
+            pos_hint: {"center_x": 0.5}
+            on_release: app.go_to_progress()
+        MDLabel:
+            text: "Progress"
+            halign: "center"
+            theme_text_color: "Secondary"
