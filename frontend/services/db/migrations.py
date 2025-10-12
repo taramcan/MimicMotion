@@ -30,6 +30,7 @@ def apply_migrations(conn: sqlite3.Connection, current_version: int) -> int:
     return target_version
 
 
+# Migration 1: Users table
 @migration(1)
 def _create_users_table(conn: sqlite3.Connection) -> None:
     conn.execute(
@@ -37,22 +38,44 @@ def _create_users_table(conn: sqlite3.Connection) -> None:
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT NOT NULL UNIQUE,
-            email TEXT,
-            last_sign_in TEXT,
-            minutes_spent_signed_on INTEGER DEFAULT 0,
-            voluntary_movement_score REAL,
-            resting_symmetry_score REAL,
-            synk_score REAL,
-            composite_score REAL,
-            symmetry_score_neutral REAL,
-            symmetry_score_eyes_closed REAL,
-            symmetry_score_eyes_shut REAL,
-            symmetry_score_surprise REAL,
-            symmetry_score_kiss REAL,
-            symmetry_score_balloon REAL,
-            symmetry_score_smile REAL,
-            symmetry_score_wide_smile REAL,
-            symmetry_score_grin REAL
-        )
+            email TEXT
+        );
+        """
+    )
+
+
+# Migration 2: Sessions table
+@migration(2)
+def _create_sessions_table(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            session_start TEXT NOT NULL DEFAULT (datetime('now')),
+            is_complete BOOLEAN DEFAULT 0,
+            notes TEXT,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        );
+        """
+    )
+
+
+# Migration 3: Pose photos table with symmetry scores
+@migration(3)
+def _create_pose_photos_table(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS pose_photos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id INTEGER NOT NULL,
+            pose_index INTEGER NOT NULL,
+            photo_path TEXT NOT NULL,
+            symmetry_score REAL NOT NULL,
+            captured_at TEXT NOT NULL DEFAULT (datetime('now')),
+            FOREIGN KEY(session_id) REFERENCES sessions(id),
+            UNIQUE(session_id, pose_index),
+            CHECK(pose_index BETWEEN 1 AND 9)
+        );
         """
     )

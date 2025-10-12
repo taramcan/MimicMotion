@@ -88,14 +88,15 @@ class MyApp(MDApp):
         self.preview.keep_ratio = True
         self.preview.pos_hint = {"center_x": 0.5, "center_y": 0.5}
         self.bottom_nav = None
+        self.db_path: Path | None = None
 
     def build(self):
         self.title = "MimicMotion"
         # TODO: restore use of App.get_running_app().user_data_dir before shipping.
         # user_data_dir = App.get_running_app().user_data_dir
         # db_path = os.path.join(user_data_dir, "mydb.db")
-        db_path = Path(__file__).resolve().parent / "mydb.db"
-        db.init_db(db_path)
+        self.db_path = Path(__file__).resolve().parent / "mydb.db"
+        db.init_db(self.db_path)
 
         Builder.load_file("screens/bottombar.kv")
         root = FloatLayout()
@@ -117,9 +118,13 @@ class MyApp(MDApp):
         progress_screen = Builder.load_file("screens/progressscreen.kv")
         self.screen_manager.add_widget(progress_screen)
 
-        # Progress screen
+        # Profile screen
         profile_screen = Builder.load_file("screens/profilescreen.kv")
         self.screen_manager.add_widget(profile_screen)
+
+        #Edit profile screen
+        edit_profile_screen = Builder.load_file("screens/editprofilescreen.kv")
+        self.screen_manager.add_widget(edit_profile_screen)
 
         root.add_widget(self.screen_manager)
         bottom_nav = Factory.BottomNavBar()
@@ -129,6 +134,7 @@ class MyApp(MDApp):
         self.bottom_nav = bottom_nav  # keep reference if needed
 
         self.screen_manager.current = "SplashScreen"
+        self.populate_profile_screen()
         return root
 
     def on_start(self):
@@ -151,7 +157,20 @@ class MyApp(MDApp):
         self.screen_manager.current = "ProgressScreen"
 
     def go_to_profile(self):
+        self.populate_profile_screen()
         self.screen_manager.current = "ProfileScreen"
+
+    def go_to_edit_profile(self):
+        edit_screen = self.screen_manager.get_screen("EditProfileScreen")
+        user = db.fetch_single_user(self.db_path) if self.db_path else None
+        name, email = "", ""
+        if user:
+            _, stored_name, stored_email = user
+            name = stored_name or ""
+            email = stored_email or ""
+        edit_screen.ids.name_input.text = name
+        edit_screen.ids.email_input.text = email
+        self.screen_manager.current = "EditProfileScreen"
 
     def on_stop(self):
         # shutdown main controller
@@ -159,16 +178,35 @@ class MyApp(MDApp):
             self.controller()
             self.controller = None
 
-    def sign_in(self):
-        landing = self.screen_manager.get_screen("LandingScreen")
-        # TODO: restore use of App.get_running_app().user_data_dir before shipping.
-        # user_data_dir = App.get_running_app().user_data_dir
-        # db_path = os.path.join(user_data_dir, "mydb.db")
-        db_path = Path(__file__).resolve().parent / "mydb.db"
-        username = landing.ids.username_input.text
-        pw = landing.ids.pw_input.text
-        db.sign_in(db_path, username, pw)
-    
+    def edit_profile(self):
+        if not self.db_path:
+            return
+
+        edit_screen = self.screen_manager.get_screen("EditProfileScreen")
+        username = edit_screen.ids.name_input.text.strip()
+        email = edit_screen.ids.email_input.text.strip()
+
+        if not username:
+            username = "User"
+
+        db.upsert_single_user(self.db_path, username, email)
+        self.populate_profile_screen()
+        self.screen_manager.current = "ProfileScreen"
+
+    def populate_profile_screen(self):
+        if not self.db_path:
+            return
+
+        profile_screen = self.screen_manager.get_screen("ProfileScreen")
+        user = db.fetch_single_user(self.db_path)
+
+        if user:
+            _, username, email = user
+            profile_screen.ids.profile_name_value.text = username or "Not set"
+            profile_screen.ids.profile_email_value.text = email or "Not set"
+        else:
+            profile_screen.ids.profile_name_value.text = "Not set"
+            profile_screen.ids.profile_email_value.text = "Not set"
 
 
 if __name__ == "__main__":

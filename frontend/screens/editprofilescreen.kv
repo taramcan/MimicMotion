@@ -1,0 +1,40 @@
+MDScreen:
+    name: "EditProfileScreen"
+    AnchorLayout:
+        anchor_x: "center"
+        anchor_y: "center"
+        padding: [dp(24), dp(88), dp(24), dp(24)]
+
+        MDCard:
+            orientation: "vertical"
+            size_hint: 0.92, None
+            adaptive_height: True
+            padding: dp(24)
+            spacing: dp(20)
+            elevation: 0
+            radius: [16, 16, 16, 16]
+
+            MDLabel:
+                text: "Edit Profile"
+                halign: "center"
+                font_style: "H5"
+
+            MDTextField:
+                id: name_input
+                hint_text: "Enter your name"
+                text: ""
+                size_hint_x: 1
+                mode: "rectangle"
+
+            MDTextField:
+                id: email_input
+                hint_text: "Enter your email address"
+                text: ""
+                size_hint_x: 1
+                mode: "rectangle"
+
+
+            MDRaisedButton:
+                text: "Save"
+                pos_hint: {"center_x": 0.5}
+                on_release: app.edit_profile()
