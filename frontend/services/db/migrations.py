@@ -43,7 +43,16 @@ def _create_users_table(conn: sqlite3.Connection) -> None:
             voluntary_movement_score REAL,
             resting_symmetry_score REAL,
             synk_score REAL,
-            composite_score REAL
+            composite_score REAL,
+            symmetry_score_neutral REAL,
+            symmetry_score_eyes_closed REAL,
+            symmetry_score_eyes_shut REAL,
+            symmetry_score_surprise REAL,
+            symmetry_score_kiss REAL,
+            symmetry_score_balloon REAL,
+            symmetry_score_smile REAL,
+            symmetry_score_wide_smile REAL,
+            symmetry_score_grin REAL
         )
         """
     )
