@@ -108,10 +108,6 @@ class MyApp(MDApp):
         landing_screen = Builder.load_file("screens/landingscreen.kv")
         self.screen_manager.add_widget(landing_screen)
 
-        #signup screen
-        signup_screen = Builder.load_file("screens/signupscreen.kv")
-        self.screen_manager.add_widget(signup_screen)
-
         # Camera screen
         camera_screen = Builder.load_file("screens/camerascreen.kv")
         camera_screen.ids.preview_container.add_widget(self.preview)
@@ -120,6 +116,10 @@ class MyApp(MDApp):
         # Progress screen
         progress_screen = Builder.load_file("screens/progressscreen.kv")
         self.screen_manager.add_widget(progress_screen)
+
+        # Progress screen
+        profile_screen = Builder.load_file("screens/profilescreen.kv")
+        self.screen_manager.add_widget(profile_screen)
 
         root.add_widget(self.screen_manager)
         bottom_nav = Factory.BottomNavBar()
@@ -150,6 +150,9 @@ class MyApp(MDApp):
     def go_to_progress(self):
         self.screen_manager.current = "ProgressScreen"
 
+    def go_to_profile(self):
+        self.screen_manager.current = "ProfileScreen"
+
     def on_stop(self):
         # shutdown main controller
         if self.controller:
@@ -166,8 +169,6 @@ class MyApp(MDApp):
         pw = landing.ids.pw_input.text
         db.sign_in(db_path, username, pw)
     
-    def sign_up(self):
-        self.screen_manager.current = "SignUpScreen"
 
 
 if __name__ == "__main__":

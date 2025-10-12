@@ -37,7 +37,7 @@ def _create_users_table(conn: sqlite3.Connection) -> None:
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT NOT NULL UNIQUE,
-            password_hash TEXT NOT NULL,
+            email TEXT,
             last_sign_in TEXT,
             minutes_spent_signed_on INTEGER DEFAULT 0,
             voluntary_movement_score REAL,
