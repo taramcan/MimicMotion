@@ -147,3 +147,93 @@ def fetch_latest_symmetry_scores(
         raise
 
     return session_date, score_rows
+
+
+def create_session(
+    db_path: str | Path,
+    user_id: int,
+    notes: str | None = None,
+) -> tuple[int, str]:
+    """Insert a new session row and return its id plus start timestamp."""
+    with _connect(db_path) as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO sessions (user_id, session_start, notes)
+            VALUES (
+                ?,
+                datetime('now'),
+                ?
+            )
+            """,
+            (user_id, notes),
+        )
+        session_id = cursor.lastrowid
+        session_row = conn.execute(
+            """
+            SELECT session_start
+            FROM sessions
+            WHERE id = ?
+            """,
+            (session_id,),
+        ).fetchone()
+
+    return session_id, session_row[0] if session_row else ""
+
+
+def upsert_pose_photo(
+    db_path: str | Path,
+    session_id: int,
+    pose_index: int,
+    photo_path: str,
+    symmetry_score: float | None = None,
+) -> None:
+    """
+    Insert or replace a pose photo entry.
+
+    Used during capture to attach the saved image path to the session.
+    """
+    with _connect(db_path) as conn:
+        conn.execute(
+            """
+            INSERT INTO pose_photos (session_id, pose_index, photo_path, symmetry_score)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(session_id, pose_index) DO UPDATE SET
+                photo_path = excluded.photo_path,
+                symmetry_score = excluded.symmetry_score,
+                captured_at = datetime('now')
+            """,
+            (session_id, pose_index, photo_path, symmetry_score),
+        )
+        conn.commit()
+
+
+def fetch_pose_photos_for_session(
+    db_path: str | Path, session_id: int
+) -> list[tuple[int, str, float | None]]:
+    """Return pose index, photo path, and symmetry score for a session."""
+    with _connect(db_path) as conn:
+        rows = conn.execute(
+            """
+            SELECT pose_index, photo_path, symmetry_score
+            FROM pose_photos
+            WHERE session_id = ?
+            ORDER BY pose_index ASC
+            """,
+            (session_id,),
+        ).fetchall()
+
+    return rows
+
+
+def mark_session_complete(db_path: str | Path, session_id: int) -> None:
+    """Flip the completion flag for *session_id*."""
+    with _connect(db_path) as conn:
+        conn.execute(
+            """
+            UPDATE sessions
+            SET is_complete = 1
+            WHERE id = ?
+            """,
+            (session_id,),
+        )
+        conn.commit()

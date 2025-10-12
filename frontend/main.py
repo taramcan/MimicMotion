@@ -15,11 +15,13 @@ from kivy.lang import Builder
 from kivy.clock import Clock
 from kivy.uix.screenmanager import ScreenManager
 from kivymd.app import MDApp
+from kivy.graphics import Color, Line
 
 from pathlib import Path
 
 from controllers.main_controller import MainController
 from services import db
+from services.session_manager import SessionManager, SessionState
 
 def parse_args():
     p = argparse.ArgumentParser()
@@ -89,6 +91,28 @@ class MyApp(MDApp):
         self.preview.pos_hint = {"center_x": 0.5, "center_y": 0.5}
         self.bottom_nav = None
         self.db_path: Path | None = None
+        self.progress_preview = Image(fit_mode="contain")
+        self.progress_preview.size_hint = (1, 1)
+        self.progress_preview.allow_stretch = True
+        self.progress_preview.keep_ratio = True
+        self.progress_preview.pos_hint = {"center_x": 0.5, "center_y": 0.5}
+        self.progress_session_manager: SessionManager | None = None
+        self.progress_state: SessionState | None = None
+        self.progress_outline_widget = None
+        self.progress_outline_line = None
+        self.progress_outline_color = None
+        self.latest_camera_texture = None
+        self.pose_definitions = [
+            {"index": 1, "name": "Neutral", "sample": "assets/pose1.png"},
+            {"index": 2, "name": "Eyes Closed", "sample": "assets/pose2.png"},
+            {"index": 3, "name": "Eyes Shut", "sample": "assets/pose3.png"},
+            {"index": 4, "name": "Surprise", "sample": "assets/pose4.png"},
+            {"index": 5, "name": "Kiss", "sample": "assets/pose5.png"},
+            {"index": 6, "name": "Balloon", "sample": "assets/pose6.png"},
+            {"index": 7, "name": "Smile", "sample": "assets/pose7.png"},
+            {"index": 8, "name": "Wide Smile", "sample": "assets/pose8.png"},
+            {"index": 9, "name": "Grin", "sample": "assets/pose9.png"},
+        ]
 
     def build(self):
         self.title = "MimicMotion"
@@ -116,6 +140,8 @@ class MyApp(MDApp):
 
         # Progress screen
         progress_screen = Builder.load_file("screens/progressscreen.kv")
+        progress_screen.ids.progress_preview_container.add_widget(self.progress_preview)
+        self._setup_progress_outline(progress_screen.ids.progress_outline_overlay)
         self.screen_manager.add_widget(progress_screen)
 
         # Profile screen
@@ -140,7 +166,11 @@ class MyApp(MDApp):
     def on_start(self):
         # Parse command line arguments; initialize main controller and pass arguments
         args = parse_args()
-        self.controller = MainController(args, preview_widget=self.preview)
+        self.controller = MainController(
+            args,
+            preview_widget=self.preview,
+            on_frame=self._on_camera_frame,
+        )
         self.screen_manager.current = "SplashScreen"
         
 
@@ -154,6 +184,8 @@ class MyApp(MDApp):
         self.screen_manager.current = "CameraScreen"
 
     def go_to_progress(self):
+        self.ensure_progress_session()
+        self._update_progress_outline()
         self.screen_manager.current = "ProgressScreen"
 
     def go_to_profile(self):
@@ -203,6 +235,7 @@ class MyApp(MDApp):
         # Reset defaults before repopulating.
         ids.profile_name_value.text = "Not set"
         ids.profile_email_value.text = "Not set"
+        ids.profile_last_session.text = "No sessions recorded"
         for idx in range(1, 10):
             score_label = ids.get(f"profile_score_{idx}")
             if score_label:
@@ -231,6 +264,176 @@ class MyApp(MDApp):
                         if symmetry_score is not None
                         else "-"
                     )
+
+    # ---------------- Progress session helpers ---------------- #
+    def ensure_progress_session(self):
+        if not self.db_path:
+            return
+
+        if not self.progress_session_manager:
+            user = db.fetch_single_user(self.db_path)
+            if not user:
+                # Ensure a default user exists so sessions can be associated.
+                db.upsert_single_user(self.db_path, "User", "")
+                user = db.fetch_single_user(self.db_path)
+
+            if not user:
+                return
+
+            user_id = user[0]
+            self.progress_session_manager = SessionManager(
+                self.db_path,
+                user_id=user_id,
+                on_pose_complete=self._on_progress_pose_captured,
+                on_session_complete=self._on_progress_session_complete,
+            )
+
+            self.progress_state = self.progress_session_manager.start_session()
+        elif not self.progress_state:
+            self.progress_state = self.progress_session_manager.start_session()
+
+        self.update_progress_ui()
+        self._update_progress_outline()
+
+    def reset_progress_session(self):
+        if not self.progress_session_manager:
+            self.ensure_progress_session()
+            return
+
+        self.progress_state = self.progress_session_manager.start_session()
+        self.update_progress_ui()
+        self._update_progress_outline()
+
+    def capture_progress_pose(self):
+        """
+        Capture handler invoked by the Progress screen.
+
+        Uses the most recent camera frame to persist a pose photo.
+        """
+        if (
+            not self.progress_session_manager
+            or not self.progress_state
+            or self.progress_state.completed
+        ):
+            return
+        texture = self.latest_camera_texture
+        if texture is None:
+            return
+        self.progress_session_manager.capture_pose_texture(texture)
+        # progress callbacks update UI; ensure local state reference stays in sync.
+        self.progress_state = self.progress_session_manager.state
+        self.update_progress_ui()
+
+    def update_progress_ui(self):
+        if not self.progress_state:
+            return
+
+        progress_screen = self.screen_manager.get_screen("ProgressScreen")
+        ids = progress_screen.ids
+
+        pose_index = self.progress_state.current_pose
+        pose_info = self._get_pose_definition(pose_index)
+        ids.pose_title.text = (
+            "Session Complete" if self.progress_state.completed else f"Pose: {pose_info['name']}"
+        )
+        ids.pose_instruction.text = (
+            "Align your face with the outline and press capture when ready."
+        )
+        ids.pose_sample.source = pose_info["sample"]
+        completed_count = pose_index - 1
+        if self.progress_state.completed:
+            completed_count = len(self.pose_definitions)
+        ids.pose_progress.value = completed_count
+        ids.pose_counter.text = (
+            "All poses captured!"
+            if self.progress_state.completed
+            else f"Pose {min(pose_index, len(self.pose_definitions))} of {len(self.pose_definitions)}"
+        )
+
+        if self.progress_state.completed:
+            ids.capture_button.text = "Session Complete"
+            ids.capture_button.disabled = True
+        else:
+            ids.capture_button.text = "Capture Pose"
+            ids.capture_button.disabled = False
+
+    def _on_progress_pose_captured(
+        self, state: SessionState, pose_index: int, file_path: Path
+    ) -> None:
+        # Update progress bar and counter after each capture.
+        self.progress_state = state
+        progress_screen = self.screen_manager.get_screen("ProgressScreen")
+        ids = progress_screen.ids
+        ids.pose_progress.value = pose_index
+        ids.pose_counter.text = f"Pose {min(state.current_pose, 9)} of 9"
+
+    def _on_progress_session_complete(self, state: SessionState) -> None:
+        self.progress_state = state
+        progress_screen = self.screen_manager.get_screen("ProgressScreen")
+        ids = progress_screen.ids
+        ids.pose_progress.value = len(self.pose_definitions)
+        ids.pose_counter.text = "All poses captured!"
+        ids.capture_button.text = "Session Complete"
+        ids.capture_button.disabled = True
+
+    def _get_pose_definition(self, pose_index: int) -> dict:
+        if pose_index < 1:
+            pose_index = 1
+        if pose_index > len(self.pose_definitions):
+            pose_index = len(self.pose_definitions)
+        return self.pose_definitions[pose_index - 1]
+
+    def _setup_progress_outline(self, outline_widget):
+        self.progress_outline_widget = outline_widget
+        if outline_widget is None:
+            return
+
+        with outline_widget.canvas:
+            self.progress_outline_color = Color(1, 1, 1, 0.6)
+            self.progress_outline_line = Line(rectangle=(0, 0, 0, 0), width=2.5)
+
+        outline_widget.bind(size=lambda *_: self._update_progress_outline())
+
+    def _update_progress_outline(self, texture=None):
+        if not self.progress_outline_line or not self.progress_outline_widget:
+            return
+
+        widget = self.progress_outline_widget
+        width, height = widget.width, widget.height
+        if width <= 0 or height <= 0:
+            return
+
+        margin = min(width, height) * 0.05
+        available_w = max(width - 2 * margin, 1)
+        available_h = max(height - 2 * margin, 1)
+
+        rect_w = available_w
+        rect_h = available_h
+
+        tex = texture or self.latest_camera_texture
+        if tex and tex.height and tex.width:
+            texture_ratio = tex.width / tex.height
+            available_ratio = available_w / available_h if available_h else texture_ratio
+
+            if available_ratio > texture_ratio:
+                rect_h = available_h
+                rect_w = rect_h * texture_ratio
+            else:
+                rect_w = available_w
+                rect_h = rect_w / texture_ratio
+
+        x = (width - rect_w) / 2
+        y = (height - rect_h) / 2
+
+        self.progress_outline_line.rectangle = (x, y, rect_w, rect_h)
+
+    def _on_camera_frame(self, texture):
+        self.latest_camera_texture = texture
+        if self.progress_preview:
+            self.progress_preview.texture = texture
+            self.progress_preview.texture_size = texture.size
+            self.progress_preview.canvas.ask_update()
+        self._update_progress_outline(texture)
 
 
 if __name__ == "__main__":

@@ -12,3 +12,6 @@ requirements.txt
 *.db
 *.sqlite
 *.sqlite3
+
+# Session photo captures
+frontend/data/sessions/

@@ -1,11 +1,99 @@
 MDScreen:
     name: "ProgressScreen"
-    MDBoxLayout:
-        orientation: "vertical"
-        padding: [0, 0, 0, dp(88)]
-        MDBoxLayout:
+    AnchorLayout:
+        anchor_x: "center"
+        anchor_y: "center"
+
+        MDCard:
             orientation: "vertical"
-            size_hint_y: 1
+            size_hint: 0.95, None
+            adaptive_height: True
+            padding: dp(20)
+            spacing: dp(16)
+            elevation: 0
+            radius: [18, 18, 18, 18]
+
             MDLabel:
-                text: "Progress Placeholder"
-                halign: 'center'
+                text: "Capture Progress"
+                halign: "center"
+                font_style: "H5"
+
+            MDLabel:
+                id: pose_title
+                text: "Ready for Neutral Pose"
+                halign: "center"
+                theme_text_color: "Primary"
+
+            MDLabel:
+                id: pose_instruction
+                text: "Review the example pose, align your face with the outline, then tap capture."
+                halign: "center"
+                theme_text_color: "Secondary"
+                text_size: (self.width, None)
+                size_hint_y: None
+                height: self.texture_size[1]
+
+            MDCard:
+                orientation: "vertical"
+                padding: dp(8)
+                radius: [12, 12, 12, 12]
+                elevation: 0
+                size_hint_y: None
+                height: root.height * 0.4
+
+                MDLabel:
+                    text: "Live Preview"
+                    halign: "center"
+                    theme_text_color: "Secondary"
+
+                FloatLayout:
+                    size_hint: 1, 1
+                    id: progress_preview_container
+
+                    Widget:
+                        id: progress_outline_overlay
+                        size_hint: 1, 1
+
+            MDCard:
+                orientation: "vertical"
+                padding: dp(8)
+                radius: [12, 12, 12, 12]
+                elevation: 0
+                size_hint_y: None
+                height: dp(140)
+
+                MDLabel:
+                    text: "Sample Pose"
+                    halign: "center"
+                    theme_text_color: "Secondary"
+
+                Image:
+                    id: pose_sample
+                    source: "assets/pose1.png"
+                    allow_stretch: True
+                    keep_ratio: True
+
+            MDProgressBar:
+                id: pose_progress
+                value: 0
+                max: 9
+
+            MDLabel:
+                id: pose_counter
+                text: "Pose 1 of 9"
+                halign: "center"
+                theme_text_color: "Secondary"
+
+            MDBoxLayout:
+                size_hint_y: None
+                height: dp(48)
+                spacing: dp(12)
+
+                MDFlatButton:
+                    text: "Start Over"
+                    on_release: app.reset_progress_session()
+
+                MDRaisedButton:
+                    text: "Capture Pose"
+                    id: capture_button
+                    on_release: app.capture_progress_pose()
