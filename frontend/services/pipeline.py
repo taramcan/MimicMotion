@@ -13,6 +13,7 @@ from services.config import Config
 from services.landmarks import FaceMeshDetector
 from services.midline import Line2D, Midline
 from services.overlay import Overlay
+from services.calculate import compute_asymmetry_metrics
 from kivy.graphics.texture import Texture
 
 # Flip map to properly map debugging points
@@ -103,6 +104,10 @@ class Pipeline:
         landmarks = self._detect_landmarks(frame)
         display_landmarks = self._mirror_landmarks_if_needed(landmarks)
         midline, perpendicular = self._compute_midline_overlays(display_landmarks)
+
+        tracked = sorted(nodes.RIGHT_LANDMARKS | nodes.MIDLINE_LANDMARKS)
+        metrics = compute_asymmetry_metrics(self.cfg, midline, tracked, display_landmarks)
+        # print("(%0.2f,%0.2f)"%(metrics.displacements[0].x_delta,metrics.displacements[0].y_delta))
 
         processed_frame = self._flip_texture_if_needed(frame)
 

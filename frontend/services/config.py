@@ -32,7 +32,7 @@ class DebugCfg:
     landmarks       :   bool = True
     midline         :   bool  = False
     perpendicular   :   bool = False
-    regions         :   bool = True
+    regions         :   bool = False
 
 
 @ dataclass
@@ -71,6 +71,26 @@ class OverlayCfg:
     region_color    : str = "#FFFF00"
     region_width    : float = 1.2
     region_nodes    : list[list[str]] = field(default_factory=_default_nodes)
+    # region_nodes    : list[dict]
+
+@dataclass
+class MethodCfg:
+    # method selector: "mirror" | "warp"
+    mode: str | None = None
+
+    # Relevant only if mode is warp
+    warp_solver: str | None = None
+    warp_blend_width: float = 0.04     # feather width for all warp solvers
+    warp_smoothing_enabled: bool = True
+    warp_smoothing_alpha: float = 0.6
+
+    warp_delaunay_refine_edges: bool = True
+    warp_delaunay_min_triangle_area: float = 1e-4
+    warp_tps_regularization: float = 0.0
+    warp_tps_grid_size: tuple[int, int] = (40, 40)
+
+    # Relevant only if mode is mirror
+    mirror_feather_width: float = 0.05   # feather around the midline mask
 
 @dataclass
 class Config:
@@ -79,5 +99,6 @@ class Config:
     debug: DebugCfg = field(default_factory=DebugCfg)
     mp: MediaPipeCfg = field(default_factory=MediaPipeCfg)
     overlay: OverlayCfg = field(default_factory=OverlayCfg)
+    method: MethodCfg = field(default_factory=MethodCfg)
 
 

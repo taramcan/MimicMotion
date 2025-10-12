@@ -55,6 +55,8 @@ class LandmarkDisplacement:
     droopy_mid_offset: float
     midline_delta: float
 
+    x_delta: float
+    y_delta: float
     weighted_delta: float
 
 
@@ -143,6 +145,7 @@ def compute_asymmetry_metrics(
 
         perp_delta = healthy_perp - droopy_perp
         mid_delta = healthy_mid - droopy_mid
+        dx, dy = _cartesian_delta(midline, mid_delta, perp_delta)
         weighted = perp_delta * mid_delta
 
         displacements.append(
@@ -158,6 +161,8 @@ def compute_asymmetry_metrics(
                 healthy_mid_offset=healthy_mid,
                 droopy_mid_offset=droopy_mid,
                 midline_delta=mid_delta,
+                x_delta=dx,
+                y_delta=dy,
                 weighted_delta=weighted,
             )
         )
@@ -245,10 +250,21 @@ def _select_counterpart(healthy_index: int, droopy_side: str) -> int | None:
 
 def _perpendicular_line(point: np.ndarray, midline: Line2D) -> Line2D:
     direction = midline.direction
-    perp_direction = np.array([-direction[1], direction[0]], dtype=np.float32)
+    perp_direction = np.array([direction[1], -direction[0]], dtype=np.float32)
     perp_direction /= np.linalg.norm(perp_direction)
     origin = np.asarray(point, dtype=np.float32)
     return Line2D(origin=origin, direction=perp_direction)
+
+
+def _cartesian_delta(midline: Line2D, mid_delta: float, perp_delta: float) -> tuple[float, float]:
+    """Return (dx, dy) with +x toward right ear and +y upward."""
+
+    direction = midline.direction
+    perp_direction = np.array([direction[1], -direction[0]], dtype=np.float32)
+    delta_vec = mid_delta * direction + perp_delta * perp_direction
+    dx = float(delta_vec[0])
+    dy = float(-delta_vec[1])
+    return dx, dy
 
 
 def _line_projections(point: np.ndarray, midline: Line2D) -> tuple[float, float]:
@@ -256,9 +272,10 @@ def _line_projections(point: np.ndarray, midline: Line2D) -> tuple[float, float]
 
     origin = midline.origin
     direction = midline.direction
-    perp_direction = np.array([-direction[1], direction[0]], dtype=np.float32)
+    perp_direction = np.array([direction[1], -direction[0]], dtype=np.float32)
 
     rel = np.asarray(point, dtype=np.float32) - origin
     mid_component = float(np.dot(rel, direction))
     perp_component = float(np.dot(rel, perp_direction))
     return mid_component, perp_component
+

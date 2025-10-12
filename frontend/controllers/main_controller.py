@@ -11,7 +11,6 @@ def build_config(args):
     cfg = Config()
     
     # runtime settings
-    cfg.runtime.mode = args.mode
     cfg.runtime.droopy = args.droopy
 
     # Camera settings
@@ -23,6 +22,10 @@ def build_config(args):
     
     # debugging settings
     cfg.debug.show_debug = args.debug
+
+    # mode and warping-method
+    cfg.method.mode = args.mode
+    cfg.method.warp_solver = args.warp_solver
 
     return cfg
 

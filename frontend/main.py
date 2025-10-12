@@ -28,9 +28,14 @@ def parse_args():
 
     # define mode for facial matching
     p.add_argument('--mode',
-                   choices=["mirror"], 
-                   default = "mirror",
+                   choices=["mirror","warp"], 
+                   default = "warp",
                    help='Methodology use to display facial matching')
+    
+    p.add_argument('--warp-solver',
+                   choices=["delaunay","tps"],
+                   default="delaunay",
+                   help="Methodology for frame warping, when warp is selected.")
     
     # flip camera for use with front face vs. world facing camera
     p.add_argument('--hflip',
@@ -58,17 +63,17 @@ def parse_args():
       
     p.add_argument('--camera_width', 
                    type=int,
-                   default=1280,
+                   default=898,
                    help='Camera width resolution')
     
     p.add_argument('--camera_height', 
                    type=int,
-                   default=720,
+                   default=1792,
                    help='Camera height resolution')
     
     p.add_argument('--camera_fps',
                    type=int,
-                   default=30,
+                   default=15,
                    help='Camera frames per second')
     
     return p.parse_args()
