@@ -139,10 +139,14 @@ class MyApp(MDApp):
         self.screen_manager.add_widget(camera_screen)
 
         # Progress screen
-        progress_screen = Builder.load_file("screens/progressscreen.kv")
+        progress_screen = Builder.load_file("screens/snapscreen.kv")
         progress_screen.ids.progress_preview_container.add_widget(self.progress_preview)
         self._setup_progress_outline(progress_screen.ids.progress_outline_overlay)
         self.screen_manager.add_widget(progress_screen)
+
+        # Progress overview screen
+        progress_overview_screen = Builder.load_file("screens/progressoverviewscreen.kv")
+        self.screen_manager.add_widget(progress_overview_screen)
 
         # Profile screen
         profile_screen = Builder.load_file("screens/profilescreen.kv")
@@ -183,10 +187,13 @@ class MyApp(MDApp):
     def go_to_camera(self):
         self.screen_manager.current = "CameraScreen"
 
-    def go_to_progress(self):
+    def go_to_snap(self):
         self.ensure_progress_session()
         self._update_progress_outline()
         self.screen_manager.current = "ProgressScreen"
+
+    def go_to_progress(self):
+        self.screen_manager.current = "ProgressOverviewScreen"
 
     def go_to_profile(self):
         self.populate_profile_screen()

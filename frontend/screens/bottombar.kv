@@ -1,3 +1,7 @@
+#:import Window kivy.core.window.Window
+#:import dp kivy.metrics.dp
+#:import sp kivy.metrics.sp
+
 <BottomNavBar@MDBoxLayout>:
     size_hint_x: 1
     size_hint_y: None
@@ -10,26 +14,45 @@
         spacing: "4dp"
         adaptive_height: True
         MDIconButton:
-            icon: "camera"
+            icon: "mirror"
             pos_hint: {"center_x": 0.5}
             on_release: app.go_to_camera()
         MDLabel:
-            text: "Camera"
+            text: "Mirror"
             halign: "center"
             theme_text_color: "Secondary"
+            font_size: sp(14) if Window.width >= dp(360) else sp(12)
+            text_size: self.width, None
 
     MDBoxLayout:
         orientation: "vertical"
         spacing: "4dp"
         adaptive_height: True
         MDIconButton:
-            icon: "file-chart"
+            icon: "camera"
+            pos_hint: {"center_x": 0.5}
+            on_release: app.go_to_snap()
+        MDLabel:
+            text: "Snap"
+            halign: "center"
+            theme_text_color: "Secondary"
+            font_size: sp(14) if Window.width >= dp(360) else sp(12)
+            text_size: self.width, None
+
+    MDBoxLayout:
+        orientation: "vertical"
+        spacing: "4dp"
+        adaptive_height: True
+        MDIconButton:
+            icon: "chart-line"
             pos_hint: {"center_x": 0.5}
             on_release: app.go_to_progress()
         MDLabel:
             text: "Progress"
             halign: "center"
             theme_text_color: "Secondary"
+            font_size: sp(14) if Window.width >= dp(360) else sp(12)
+            text_size: self.width, None
 
     MDBoxLayout:
         orientation: "vertical"
@@ -43,3 +66,5 @@
             text: "Profile"
             halign: "center"
             theme_text_color: "Secondary"
+            font_size: sp(14) if Window.width >= dp(360) else sp(12)
+            text_size: self.width, None
