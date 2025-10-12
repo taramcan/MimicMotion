@@ -29,21 +29,6 @@
         spacing: "4dp"
         adaptive_height: True
         MDIconButton:
-            icon: "camera"
-            pos_hint: {"center_x": 0.5}
-            on_release: app.go_to_snap()
-        MDLabel:
-            text: "Snap"
-            halign: "center"
-            theme_text_color: "Secondary"
-            font_size: sp(14) if Window.width >= dp(360) else sp(12)
-            text_size: self.width, None
-
-    MDBoxLayout:
-        orientation: "vertical"
-        spacing: "4dp"
-        adaptive_height: True
-        MDIconButton:
             icon: "chart-line"
             pos_hint: {"center_x": 0.5}
             on_release: app.go_to_progress()

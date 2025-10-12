@@ -14,6 +14,7 @@ from kivy.core.window import Window
 from kivy.lang import Builder
 from kivy.clock import Clock
 from kivy.uix.screenmanager import ScreenManager
+from kivy.metrics import dp
 from kivymd.app import MDApp
 from kivy.graphics import Color, Line
 
@@ -22,6 +23,8 @@ from pathlib import Path
 from controllers.main_controller import MainController
 from services import db
 from services.session_manager import SessionManager, SessionState
+from kivymd.uix.boxlayout import MDBoxLayout
+from kivymd.uix.label import MDLabel
 
 def parse_args():
     p = argparse.ArgumentParser()
@@ -138,11 +141,11 @@ class MyApp(MDApp):
         camera_screen.ids.preview_container.add_widget(self.preview)
         self.screen_manager.add_widget(camera_screen)
 
-        # Progress screen
-        progress_screen = Builder.load_file("screens/snapscreen.kv")
-        progress_screen.ids.progress_preview_container.add_widget(self.progress_preview)
-        self._setup_progress_outline(progress_screen.ids.progress_outline_overlay)
-        self.screen_manager.add_widget(progress_screen)
+        # Snapshot screen
+        snapshot_screen = Builder.load_file("screens/snapshotscreen.kv")
+        snapshot_screen.ids.progress_preview_container.add_widget(self.progress_preview)
+        self._setup_progress_outline(snapshot_screen.ids.progress_outline_overlay)
+        self.screen_manager.add_widget(snapshot_screen)
 
         # Progress overview screen
         progress_overview_screen = Builder.load_file("screens/progressoverviewscreen.kv")
@@ -165,6 +168,7 @@ class MyApp(MDApp):
 
         self.screen_manager.current = "SplashScreen"
         self.populate_profile_screen()
+        self.populate_progress_overview()
         return root
 
     def on_start(self):
@@ -190,9 +194,10 @@ class MyApp(MDApp):
     def go_to_snap(self):
         self.ensure_progress_session()
         self._update_progress_outline()
-        self.screen_manager.current = "ProgressScreen"
+        self.screen_manager.current = "SnapshotScreen"
 
     def go_to_progress(self):
+        self.populate_progress_overview()
         self.screen_manager.current = "ProgressOverviewScreen"
 
     def go_to_profile(self):
@@ -232,6 +237,190 @@ class MyApp(MDApp):
         self.populate_profile_screen()
         self.screen_manager.current = "ProfileScreen"
 
+    def populate_progress_overview(self):
+        if not self.db_path:
+            return
+
+        progress_screen = self.screen_manager.get_screen("ProgressOverviewScreen")
+        container = progress_screen.ids.get("progress_session_container")
+        if container is None:
+            return
+
+        container.clear_widgets()
+
+        user = db.fetch_single_user(self.db_path)
+        if not user:
+            container.add_widget(
+                MDLabel(
+                    text="Add a profile to start tracking sessions.",
+                    halign="center",
+                    theme_text_color="Secondary",
+                    size_hint_y=None,
+                    height=dp(40),
+                )
+            )
+            return
+
+        user_id = user[0]
+        sessions = db.fetch_sessions_with_photos(self.db_path, user_id)
+
+        if not sessions:
+            container.add_widget(
+                MDLabel(
+                    text="No sessions captured yet.",
+                    halign="center",
+                    theme_text_color="Secondary",
+                    size_hint_y=None,
+                    height=dp(40),
+                )
+            )
+            return
+
+        sessions = list(reversed(sessions))
+
+        col_spacing = dp(12)
+        cell_width = dp(140)
+        image_height = dp(160)
+        row_count = len(self.pose_definitions)
+        column_count = len(sessions)
+        total_spacing = col_spacing * max(column_count - 1, 0)
+        row_width = (cell_width * column_count) + total_spacing
+
+        session_pose_maps = []
+        session_headers: list[str] = []
+        for session in sessions:
+            pose_lookup = {
+                photo["pose_index"]: photo for photo in session.get("photos", [])
+            }
+            session_pose_maps.append(pose_lookup)
+
+            session_start = session.get("session_start") or ""
+            header_text = session_start.split(" ")[0] if session_start else ""
+            if not header_text:
+                header_text = f"Session {session['session_id']}"
+            session_headers.append(header_text)
+
+        grid_container = MDBoxLayout(
+            orientation="vertical",
+            adaptive_height=True,
+            spacing=dp(8),
+            size_hint=(None, None),
+        )
+        grid_container.width = row_width
+
+        header_row = MDBoxLayout(
+            orientation="horizontal",
+            spacing=col_spacing,
+            size_hint=(None, None),
+            height=dp(32),
+        )
+        header_row.width = row_width
+
+        for header_text in session_headers:
+            header_label = MDLabel(
+                text=header_text,
+                halign="center",
+                theme_text_color="Primary",
+                size_hint=(None, None),
+                width=cell_width,
+                height=dp(32),
+            )
+            header_label.text_size = (cell_width, None)
+            header_label.bind(
+                width=lambda widget, value: setattr(widget, "text_size", (value, None))
+            )
+            header_row.add_widget(header_label)
+
+        grid_container.add_widget(header_row)
+
+        for pose_index in range(1, row_count + 1):
+            pose_def = self.pose_definitions[pose_index - 1]
+            row_layout = MDBoxLayout(
+                orientation="horizontal",
+                spacing=col_spacing,
+                size_hint=(None, None),
+            )
+            row_layout.width = row_width
+            row_layout.height = image_height + dp(28)
+
+            for pose_lookup in session_pose_maps:
+                pose_info = pose_lookup.get(pose_index)
+
+                photo_path = None
+                symmetry_score = None
+                if pose_info:
+                    raw_path = pose_info.get("photo_path")
+                    if raw_path:
+                        candidate_path = Path(raw_path)
+                        if candidate_path.exists():
+                            photo_path = str(candidate_path)
+                    symmetry_score = pose_info.get("symmetry_score")
+
+                cell = MDBoxLayout(
+                    orientation="vertical",
+                    spacing=dp(2),
+                    padding=[0, 0, 0, 0],
+                    size_hint=(None, None),
+                    width=cell_width,
+                    height=image_height + dp(12),
+                )
+
+                if photo_path:
+                    pose_image = Image(
+                        source=photo_path,
+                        allow_stretch=True,
+                        keep_ratio=True,
+                        size_hint=(1, None),
+                        height=image_height,
+                    )
+                    cell.add_widget(pose_image)
+                else:
+                    placeholder = MDBoxLayout(
+                        orientation="vertical",
+                        size_hint=(1, None),
+                        height=image_height,
+                        padding=[dp(6), dp(6), dp(6), dp(6)],
+                    )
+                    placeholder_label = MDLabel(
+                        text="No capture",
+                        halign="center",
+                        theme_text_color="Secondary",
+                        size_hint=(1, 1),
+                        font_style="Caption",
+                    )
+                    placeholder.add_widget(placeholder_label)
+                    cell.add_widget(placeholder)
+
+                score_text = (
+                    f"Symmetry score: {symmetry_score:.2f}"
+                    if symmetry_score is not None
+                    else "Symmetry score: --"
+                )
+
+                score_label = MDLabel(
+                    text=score_text,
+                    halign="center",
+                    theme_text_color="Secondary",
+                    size_hint=(1, None),
+                    font_style="Caption",
+                )
+                score_label.text_size = (cell_width, None)
+                score_label.bind(
+                    texture_size=lambda widget, value: setattr(widget, "height", max(value[1], dp(12))),
+                )
+                score_label.bind(
+                    width=lambda widget, value: setattr(widget, "text_size", (value, None))
+                )
+                cell.add_widget(score_label)
+
+                row_layout.add_widget(cell)
+
+            grid_container.add_widget(row_layout)
+
+        grid_container.height = grid_container.minimum_height
+        container.width = max(row_width, grid_container.width)
+        container.add_widget(grid_container)
+
     def populate_profile_screen(self):
         if not self.db_path:
             return
@@ -242,11 +431,6 @@ class MyApp(MDApp):
         # Reset defaults before repopulating.
         ids.profile_name_value.text = "Not set"
         ids.profile_email_value.text = "Not set"
-        ids.profile_last_session.text = "No sessions recorded"
-        for idx in range(1, 10):
-            score_label = ids.get(f"profile_score_{idx}")
-            if score_label:
-                score_label.text = "-"
 
         user = db.fetch_single_user(self.db_path)
 
@@ -257,20 +441,6 @@ class MyApp(MDApp):
         ids.profile_name_value.text = username or "Not set"
         ids.profile_email_value.text = email or "Not set"
 
-        session_date, scores = db.fetch_latest_symmetry_scores(self.db_path, user_id)
-
-        if session_date:
-            ids.profile_last_session.text = f"Last session: {session_date}"
-
-        for photo_index, symmetry_score in scores:
-            if 1 <= photo_index <= 9:
-                label = ids.get(f"profile_score_{photo_index}")
-                if label:
-                    label.text = (
-                        f"{symmetry_score:.2f}"
-                        if symmetry_score is not None
-                        else "-"
-                    )
 
     # ---------------- Progress session helpers ---------------- #
     def ensure_progress_session(self):
@@ -335,8 +505,8 @@ class MyApp(MDApp):
         if not self.progress_state:
             return
 
-        progress_screen = self.screen_manager.get_screen("ProgressScreen")
-        ids = progress_screen.ids
+        snapshot_screen = self.screen_manager.get_screen("SnapshotScreen")
+        ids = snapshot_screen.ids
 
         pose_index = self.progress_state.current_pose
         pose_info = self._get_pose_definition(pose_index)
@@ -369,19 +539,20 @@ class MyApp(MDApp):
     ) -> None:
         # Update progress bar and counter after each capture.
         self.progress_state = state
-        progress_screen = self.screen_manager.get_screen("ProgressScreen")
-        ids = progress_screen.ids
+        snapshot_screen = self.screen_manager.get_screen("SnapshotScreen")
+        ids = snapshot_screen.ids
         ids.pose_progress.value = pose_index
         ids.pose_counter.text = f"Pose {min(state.current_pose, 9)} of 9"
 
     def _on_progress_session_complete(self, state: SessionState) -> None:
         self.progress_state = state
-        progress_screen = self.screen_manager.get_screen("ProgressScreen")
-        ids = progress_screen.ids
+        snapshot_screen = self.screen_manager.get_screen("SnapshotScreen")
+        ids = snapshot_screen.ids
         ids.pose_progress.value = len(self.pose_definitions)
         ids.pose_counter.text = "All poses captured!"
         ids.capture_button.text = "Session Complete"
         ids.capture_button.disabled = True
+        self.populate_progress_overview()
 
     def _get_pose_definition(self, pose_index: int) -> dict:
         if pose_index < 1:

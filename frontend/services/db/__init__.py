@@ -104,51 +104,6 @@ def upsert_single_user(db_path: str | Path, username: str, email: str) -> None:
         conn.commit()
 
 
-def fetch_latest_symmetry_scores(
-    db_path: str | Path, user_id: int
-) -> tuple[str | None, list[tuple[int, float | None]]]:
-    """
-    Return the most recent session date and its symmetry scores for the user.
-
-    Scores are ordered by photo index. If the user has no sessions, an empty
-    list is returned alongside None for the session date.
-    """
-    try:
-        with _connect(db_path) as conn:
-            session_row = conn.execute(
-                """
-                SELECT id, session_date
-                FROM photo_sessions
-                WHERE user_id = ?
-                ORDER BY COALESCE(datetime(session_date), session_date) DESC, id DESC
-                LIMIT 1
-                """,
-                (user_id,),
-            ).fetchone()
-
-            if not session_row:
-                return None, []
-
-            session_id, session_date = session_row
-
-            score_rows = conn.execute(
-                """
-                SELECT photo_index, symmetry_score
-                FROM photo_symmetry_scores
-                WHERE session_id = ?
-                ORDER BY photo_index ASC
-                """,
-                (session_id,),
-            ).fetchall()
-    except sqlite3.OperationalError as exc:
-        # When legacy databases are missing the new tables, behave as if no data exists.
-        if "no such table" in str(exc):
-            return None, []
-        raise
-
-    return session_date, score_rows
-
-
 def create_session(
     db_path: str | Path,
     user_id: int,
@@ -237,3 +192,56 @@ def mark_session_complete(db_path: str | Path, session_id: int) -> None:
             (session_id,),
         )
         conn.commit()
+
+
+def fetch_sessions_with_photos(
+    db_path: str | Path, user_id: int
+) -> list[dict[str, object]]:
+    """
+    Return all sessions for *user_id* with their captured pose information.
+
+    Sessions are ordered from newest to oldest.
+    """
+    sessions: list[dict[str, object]] = []
+
+    with _connect(db_path) as conn:
+        session_rows = conn.execute(
+            """
+            SELECT id, session_start, is_complete
+            FROM sessions
+            WHERE user_id = ?
+            ORDER BY COALESCE(datetime(session_start), session_start) DESC, id DESC
+            """,
+            (user_id,),
+        ).fetchall()
+
+        for session_id, session_start, is_complete in session_rows:
+            photo_rows = conn.execute(
+                """
+                SELECT pose_index, photo_path, symmetry_score
+                FROM pose_photos
+                WHERE session_id = ?
+                ORDER BY pose_index ASC
+                """,
+                (session_id,),
+            ).fetchall()
+
+            photos = [
+                {
+                    "pose_index": pose_index,
+                    "photo_path": photo_path,
+                    "symmetry_score": symmetry_score,
+                }
+                for pose_index, photo_path, symmetry_score in photo_rows
+            ]
+
+            sessions.append(
+                {
+                    "session_id": session_id,
+                    "session_start": session_start,
+                    "is_complete": bool(is_complete),
+                    "photos": photos,
+                }
+            )
+
+    return sessions
