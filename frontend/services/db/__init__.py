@@ -49,24 +49,6 @@ def init_db(db_path: str | Path) -> None:
             )
 
 
-def sign_in(db_path: str | Path, username: str, _password: str) -> bool:
-    """
-    Placeholder sign-in check. For now we verify that the user exists.
-    Extend this once password support is implemented.
-    """
-    with _connect(db_path) as conn:
-        row = conn.execute(
-            "SELECT id FROM users WHERE username = ?",
-            (username,),
-        ).fetchone()
-
-    if row is None:
-        return False
-
-    # TODO: When password hashing is implemented, compare _password against the stored hash.
-    return True
-
-
 def fetch_users(db_path: str | Path) -> list[tuple[int, str, str | None]]:
     """Return all users ordered by insertion."""
     with _connect(db_path) as conn:
@@ -120,3 +102,48 @@ def upsert_single_user(db_path: str | Path, username: str, email: str) -> None:
             (username, email),
         )
         conn.commit()
+
+
+def fetch_latest_symmetry_scores(
+    db_path: str | Path, user_id: int
+) -> tuple[str | None, list[tuple[int, float | None]]]:
+    """
+    Return the most recent session date and its symmetry scores for the user.
+
+    Scores are ordered by photo index. If the user has no sessions, an empty
+    list is returned alongside None for the session date.
+    """
+    try:
+        with _connect(db_path) as conn:
+            session_row = conn.execute(
+                """
+                SELECT id, session_date
+                FROM photo_sessions
+                WHERE user_id = ?
+                ORDER BY COALESCE(datetime(session_date), session_date) DESC, id DESC
+                LIMIT 1
+                """,
+                (user_id,),
+            ).fetchone()
+
+            if not session_row:
+                return None, []
+
+            session_id, session_date = session_row
+
+            score_rows = conn.execute(
+                """
+                SELECT photo_index, symmetry_score
+                FROM photo_symmetry_scores
+                WHERE session_id = ?
+                ORDER BY photo_index ASC
+                """,
+                (session_id,),
+            ).fetchall()
+    except sqlite3.OperationalError as exc:
+        # When legacy databases are missing the new tables, behave as if no data exists.
+        if "no such table" in str(exc):
+            return None, []
+        raise
+
+    return session_date, score_rows

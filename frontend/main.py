@@ -198,15 +198,39 @@ class MyApp(MDApp):
             return
 
         profile_screen = self.screen_manager.get_screen("ProfileScreen")
+        ids = profile_screen.ids
+
+        # Reset defaults before repopulating.
+        ids.profile_name_value.text = "Not set"
+        ids.profile_email_value.text = "Not set"
+        for idx in range(1, 10):
+            score_label = ids.get(f"profile_score_{idx}")
+            if score_label:
+                score_label.text = "-"
+
         user = db.fetch_single_user(self.db_path)
 
-        if user:
-            _, username, email = user
-            profile_screen.ids.profile_name_value.text = username or "Not set"
-            profile_screen.ids.profile_email_value.text = email or "Not set"
-        else:
-            profile_screen.ids.profile_name_value.text = "Not set"
-            profile_screen.ids.profile_email_value.text = "Not set"
+        if not user:
+            return
+
+        user_id, username, email = user
+        ids.profile_name_value.text = username or "Not set"
+        ids.profile_email_value.text = email or "Not set"
+
+        session_date, scores = db.fetch_latest_symmetry_scores(self.db_path, user_id)
+
+        if session_date:
+            ids.profile_last_session.text = f"Last session: {session_date}"
+
+        for photo_index, symmetry_score in scores:
+            if 1 <= photo_index <= 9:
+                label = ids.get(f"profile_score_{photo_index}")
+                if label:
+                    label.text = (
+                        f"{symmetry_score:.2f}"
+                        if symmetry_score is not None
+                        else "-"
+                    )
 
 
 if __name__ == "__main__":
