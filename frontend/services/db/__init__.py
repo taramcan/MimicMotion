@@ -104,46 +104,144 @@ def upsert_single_user(db_path: str | Path, username: str, email: str) -> None:
         conn.commit()
 
 
-def fetch_latest_symmetry_scores(
+def create_session(
+    db_path: str | Path,
+    user_id: int,
+    notes: str | None = None,
+) -> tuple[int, str]:
+    """Insert a new session row and return its id plus start timestamp."""
+    with _connect(db_path) as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO sessions (user_id, session_start, notes)
+            VALUES (
+                ?,
+                datetime('now'),
+                ?
+            )
+            """,
+            (user_id, notes),
+        )
+        session_id = cursor.lastrowid
+        session_row = conn.execute(
+            """
+            SELECT session_start
+            FROM sessions
+            WHERE id = ?
+            """,
+            (session_id,),
+        ).fetchone()
+
+    return session_id, session_row[0] if session_row else ""
+
+
+def upsert_pose_photo(
+    db_path: str | Path,
+    session_id: int,
+    pose_index: int,
+    photo_path: str,
+    symmetry_score: float | None = None,
+) -> None:
+    """
+    Insert or replace a pose photo entry.
+
+    Used during capture to attach the saved image path to the session.
+    """
+    with _connect(db_path) as conn:
+        conn.execute(
+            """
+            INSERT INTO pose_photos (session_id, pose_index, photo_path, symmetry_score)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(session_id, pose_index) DO UPDATE SET
+                photo_path = excluded.photo_path,
+                symmetry_score = excluded.symmetry_score,
+                captured_at = datetime('now')
+            """,
+            (session_id, pose_index, photo_path, symmetry_score),
+        )
+        conn.commit()
+
+
+def fetch_pose_photos_for_session(
+    db_path: str | Path, session_id: int
+) -> list[tuple[int, str, float | None]]:
+    """Return pose index, photo path, and symmetry score for a session."""
+    with _connect(db_path) as conn:
+        rows = conn.execute(
+            """
+            SELECT pose_index, photo_path, symmetry_score
+            FROM pose_photos
+            WHERE session_id = ?
+            ORDER BY pose_index ASC
+            """,
+            (session_id,),
+        ).fetchall()
+
+    return rows
+
+
+def mark_session_complete(db_path: str | Path, session_id: int) -> None:
+    """Flip the completion flag for *session_id*."""
+    with _connect(db_path) as conn:
+        conn.execute(
+            """
+            UPDATE sessions
+            SET is_complete = 1
+            WHERE id = ?
+            """,
+            (session_id,),
+        )
+        conn.commit()
+
+
+def fetch_sessions_with_photos(
     db_path: str | Path, user_id: int
-) -> tuple[str | None, list[tuple[int, float | None]]]:
+) -> list[dict[str, object]]:
     """
-    Return the most recent session date and its symmetry scores for the user.
+    Return all sessions for *user_id* with their captured pose information.
 
-    Scores are ordered by photo index. If the user has no sessions, an empty
-    list is returned alongside None for the session date.
+    Sessions are ordered from newest to oldest.
     """
-    try:
-        with _connect(db_path) as conn:
-            session_row = conn.execute(
+    sessions: list[dict[str, object]] = []
+
+    with _connect(db_path) as conn:
+        session_rows = conn.execute(
+            """
+            SELECT id, session_start, is_complete
+            FROM sessions
+            WHERE user_id = ?
+            ORDER BY COALESCE(datetime(session_start), session_start) DESC, id DESC
+            """,
+            (user_id,),
+        ).fetchall()
+
+        for session_id, session_start, is_complete in session_rows:
+            photo_rows = conn.execute(
                 """
-                SELECT id, session_date
-                FROM photo_sessions
-                WHERE user_id = ?
-                ORDER BY COALESCE(datetime(session_date), session_date) DESC, id DESC
-                LIMIT 1
-                """,
-                (user_id,),
-            ).fetchone()
-
-            if not session_row:
-                return None, []
-
-            session_id, session_date = session_row
-
-            score_rows = conn.execute(
-                """
-                SELECT photo_index, symmetry_score
-                FROM photo_symmetry_scores
+                SELECT pose_index, photo_path, symmetry_score
+                FROM pose_photos
                 WHERE session_id = ?
-                ORDER BY photo_index ASC
+                ORDER BY pose_index ASC
                 """,
                 (session_id,),
             ).fetchall()
-    except sqlite3.OperationalError as exc:
-        # When legacy databases are missing the new tables, behave as if no data exists.
-        if "no such table" in str(exc):
-            return None, []
-        raise
 
-    return session_date, score_rows
+            photos = [
+                {
+                    "pose_index": pose_index,
+                    "photo_path": photo_path,
+                    "symmetry_score": symmetry_score,
+                }
+                for pose_index, photo_path, symmetry_score in photo_rows
+            ]
+
+            sessions.append(
+                {
+                    "session_id": session_id,
+                    "session_start": session_start,
+                    "is_complete": bool(is_complete),
+                    "photos": photos,
+                }
+            )
+
+    return sessions
