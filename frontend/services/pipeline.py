@@ -55,6 +55,23 @@ def _convex_hull(points: np.ndarray) -> Optional[np.ndarray]:
     return hull if hull.shape[0] >= 3 else None
 
 
+def _clamp01(point: np.ndarray) -> np.ndarray:
+    out = np.asarray(point, dtype=np.float32)
+    out[0] = min(max(out[0], 0.0), 1.0)
+    out[1] = min(max(out[1], 0.0), 1.0)
+    return out
+
+
+def _reflect_point_across_line(point: np.ndarray, line: Line2D) -> np.ndarray:
+    p = np.asarray(point, dtype=np.float32)
+    origin = np.asarray(line.origin, dtype=np.float32)
+    direction = np.asarray(line.direction, dtype=np.float32)
+    v = p - origin
+    proj = np.dot(v, direction) * direction
+    perp = v - proj
+    return origin + proj - perp
+
+
 class Pipeline:
     """Orchestrates camera frames, landmark detection, and overlay rendering."""
 
@@ -82,7 +99,7 @@ class Pipeline:
                     continue
                 name = "/".join(("face",) + path)
 
-            if self.cfg.camera.hflip:
+            if self._camera_hflip_enabled():
                 indices = sorted(FLIP_MAP.get(idx, idx) for idx in indices)
 
             if len(indices) < 3:
@@ -103,27 +120,157 @@ class Pipeline:
             return None
 
         landmarks = self._detect_landmarks(frame)
-        display_landmarks = self._mirror_landmarks_if_needed(landmarks)
-        midline, perpendicular = self._compute_midline_overlays(display_landmarks)
 
-        pose_ok = self._pose_within_limits(display_landmarks)
+        midline_raw: Optional[Line2D] = None
+        if landmarks is not None:
+            try:
+                midline_raw = self.midline_helper.midsagittal_line(landmarks[:, :2])
+            except Exception:
+                midline_raw = None
+
+        display_landmarks = self._mirror_landmarks_if_needed(landmarks)
+        midline_display, perpendicular = self._compute_midline_overlays(display_landmarks)
+
+        pose_ok = self._pose_within_limits(landmarks)
         metrics = None
-        if pose_ok and midline is not None and display_landmarks is not None:
+        if pose_ok and midline_raw is not None and landmarks is not None:
             tracked = self._healthy_with_midline_indices()
-            metrics = compute_asymmetry_metrics(self.cfg, midline, tracked, display_landmarks)
+            metrics = compute_asymmetry_metrics(self.cfg, midline_raw, tracked, landmarks)
         self._last_metrics = metrics
 
         processed_frame = self._flip_texture_if_needed(frame)
 
         if self.overlay:
-            instructions = self._build_overlay_instructions(display_landmarks, midline, perpendicular)
-            self.overlay.draw(processed_frame, instructions)
+            instructions = self._build_overlay_instructions(display_landmarks, midline_display, perpendicular) or []
+            if getattr(self.cfg.debug, "displacements", False) and metrics is not None and midline_raw is not None:
+                midline_overlay = midline_display or self._mirror_line_if_needed(midline_raw)
+                instructions.extend(self._build_displacement_overlay(metrics, midline_overlay))
+            if instructions:
+                self.overlay.draw(processed_frame, instructions)
 
         return processed_frame
 
     # ------------------------------------------------------------------ #
     # Landmark handling
     # ------------------------------------------------------------------ #
+    def _build_displacement_overlay(
+        self,
+        metrics,
+        midline: Line2D | None,
+    ) -> list[dict]:
+        if metrics is None or midline is None or not getattr(metrics, "displacements", None):
+            return []
+
+        allowed = list(self.cfg.method.displacement_indices or [])
+        allowed_set = set(allowed)
+        allowed_set.update(FLIP_MAP.get(idx, idx) for idx in list(allowed_set))
+
+        healthy_pts: list[np.ndarray] = []
+        droopy_pts: list[np.ndarray] = []
+        target_pts: list[np.ndarray] = []
+        segments: list[tuple[np.ndarray, np.ndarray]] = []
+
+        droopy_side = (metrics.droopy_side or "left").lower()
+        hflip = self._camera_hflip_enabled()
+        droopy_should_be_right = droopy_side == ("right" if hflip else "left")
+
+        for disp in metrics.displacements:
+            if allowed_set and disp.healthy_index not in allowed_set and disp.droopy_index not in allowed_set:
+                continue
+
+            healthy_disp = self._to_display_xy(np.asarray(disp.healthy_coords, dtype=np.float32)[:2])
+            droopy_disp = self._to_display_xy(np.asarray(disp.droopy_coords, dtype=np.float32)[:2])
+            healthy_idx = disp.healthy_index
+            droopy_idx = disp.droopy_index
+
+            droopy_actual_right = droopy_disp[0] > healthy_disp[0]
+            if abs(droopy_disp[0] - healthy_disp[0]) <= 1e-5:
+                droopy_actual_right = droopy_should_be_right
+            if droopy_should_be_right != droopy_actual_right:
+                healthy_disp, droopy_disp = droopy_disp, healthy_disp
+                healthy_idx, droopy_idx = droopy_idx, healthy_idx
+
+            target_disp = _reflect_point_across_line(healthy_disp, midline)
+            target_disp = _clamp01(target_disp)
+
+            if np.allclose(target_disp, healthy_disp, atol=1e-3):
+                target_disp = droopy_disp.copy()
+
+            healthy_pts.append(healthy_disp)
+            droopy_pts.append(droopy_disp)
+            target_pts.append(target_disp)
+            segments.append((droopy_disp, target_disp))
+
+            # if __debug__:
+            #     print(
+            #         "healthy_idx",
+            #         healthy_idx,
+            #         "healthy",
+            #         healthy_disp,
+            #         "droopy_idx",
+            #         droopy_idx,
+            #         "droopy",
+            #         droopy_disp,
+            #         "target",
+            #         target_disp,
+            #     )
+
+        instructions: list[dict] = []
+        if healthy_pts:
+            instructions.append(
+                {
+                    "draw": "points",
+                    "debug": "displacements",
+                    "group": "displacement_healthy",
+                    "location": np.asarray(healthy_pts, dtype=np.float32),
+                    "color": self.cfg.overlay.disp_healthy_color,
+                    "size": self.cfg.overlay.disp_point_radius,
+                }
+            )
+        if droopy_pts:
+            instructions.append(
+                {
+                    "draw": "points",
+                    "debug": "displacements",
+                    "group": "displacement_droopy",
+                    "location": np.asarray(droopy_pts, dtype=np.float32),
+                    "color": self.cfg.overlay.disp_droopy_color,
+                    "size": self.cfg.overlay.disp_point_radius,
+                }
+            )
+        if target_pts:
+            instructions.append(
+                {
+                    "draw": "points",
+                    "debug": "displacements",
+                    "group": "displacement_target",
+                    "location": np.asarray(target_pts, dtype=np.float32),
+                    "color": self.cfg.overlay.disp_target_color,
+                    "size": self.cfg.overlay.disp_point_radius,
+                }
+            )
+        for idx, (start_pt, end_pt) in enumerate(segments):
+            instructions.append(
+                {
+                    "draw": "segment",
+                    "debug": "displacements",
+                    "points": np.asarray([start_pt, end_pt], dtype=np.float32),
+                    "color": self.cfg.overlay.disp_line_color,
+                    "width": self.cfg.overlay.disp_line_width,
+                    "slot": idx,
+                    "z": -1,
+                }
+            )
+
+        return instructions
+
+    def _to_display_xy(self, xy: np.ndarray) -> np.ndarray:
+        point = _clamp01(xy)
+        if self._camera_hflip_enabled():
+            point = point.copy()
+            point[0] = 1.0 - point[0]
+        return point
+
     def _detect_landmarks(self, frame: Texture) -> Optional[np.ndarray]:
         landmarks = self.detector.detect(frame)
         if landmarks is not None:
@@ -133,11 +280,28 @@ class Pipeline:
         return landmarks
 
     def _mirror_landmarks_if_needed(self, landmarks: Optional[np.ndarray]) -> Optional[np.ndarray]:
-        if landmarks is None or not self.cfg.camera.hflip:
+        if landmarks is None or not self._camera_hflip_enabled():
             return landmarks
         mirrored = landmarks.copy()
         mirrored[:, 0] = 1.0 - mirrored[:, 0]
         return mirrored
+
+    def _mirror_line_if_needed(self, line: Optional[Line2D]) -> Optional[Line2D]:
+        if line is None or not self._camera_hflip_enabled():
+            return line
+
+        origin = np.asarray(line.origin, dtype=np.float32).copy()
+        origin[0] = 1.0 - origin[0]
+
+        direction = np.asarray(line.direction, dtype=np.float32).copy()
+        direction[0] = -direction[0]
+        norm = np.linalg.norm(direction)
+        if norm == 0.0:
+            direction = np.array([0.0, 1.0], dtype=np.float32)
+            norm = 1.0
+        direction /= norm
+
+        return Line2D(origin=origin, direction=direction)
 
     # ------------------------------------------------------------------ #
     # Midline helpers
@@ -164,8 +328,14 @@ class Pipeline:
     # ------------------------------------------------------------------ #
     # Frame utilities
     # ------------------------------------------------------------------ #
+    def _camera_hflip_enabled(self) -> bool:
+        value = self.cfg.camera.hflip
+        if isinstance(value, str):
+            return value.strip().lower() in {"true", "1", "yes", "on"}
+        return bool(value)
+
     def _flip_texture_if_needed(self, frame: Texture) -> Texture:
-        if not self.cfg.camera.hflip:
+        if not self._camera_hflip_enabled():
             return frame
         flipped = frame.get_region(0, 0, frame.width, frame.height)
         flipped.flip_horizontal()
@@ -197,6 +367,93 @@ class Pipeline:
             )
 
         return overlays
+
+        if metrics is None or not metrics.displacements:
+            return []
+
+        allowed = list(self.cfg.method.displacement_indices or [])
+        allowed_set = set(allowed)
+        mirrored_allowed = {FLIP_MAP.get(idx, idx) for idx in allowed_set}
+        allowed_set.update(mirrored_allowed)
+
+        healthy_pts = []
+        droopy_pts = []
+        target_pts = []
+        segments = []
+
+        for disp in metrics.displacements:
+            if allowed_set and disp.healthy_index not in allowed_set and disp.droopy_index not in allowed_set:
+                continue
+
+            healthy = np.asarray(disp.healthy_coords, dtype=np.float32)[:2]
+            droopy = np.asarray(disp.droopy_coords, dtype=np.float32)[:2]
+            target = _reflect_point_across_line(healthy, midline)
+
+            healthy_norm = _clamp01(healthy)
+            droopy_norm = _clamp01(droopy)
+            target_norm = _clamp01(target)
+
+            if self._camera_hflip_enabled():
+                healthy_norm[0] = 1.0 - healthy_norm[0]
+                droopy_norm[0] = 1.0 - droopy_norm[0]
+                target_norm[0] = 1.0 - target_norm[0]
+
+            if __debug__:
+                print('disp', disp.healthy_index, 'healthy', healthy_norm, 'droopy', droopy_norm, 'target', target_norm)
+
+            healthy_pts.append(healthy_norm)
+            droopy_pts.append(droopy_norm)
+            target_pts.append(target_norm)
+            segments.append((droopy_norm, target_norm))
+
+        instructions: list[dict] = []
+        if healthy_pts:
+            instructions.append(
+                {
+                    "draw": "points",
+                    "debug": "displacements",
+                    "group": "displacement_healthy",
+                    "location": np.asarray(healthy_pts, dtype=np.float32),
+                    "color": self.cfg.overlay.disp_healthy_color,
+                    "size": self.cfg.overlay.disp_point_radius,
+                }
+            )
+        if droopy_pts:
+            instructions.append(
+                {
+                    "draw": "points",
+                    "debug": "displacements",
+                    "group": "displacement_droopy",
+                    "location": np.asarray(droopy_pts, dtype=np.float32),
+                    "color": self.cfg.overlay.disp_droopy_color,
+                    "size": self.cfg.overlay.disp_point_radius,
+                }
+            )
+        if target_pts:
+            instructions.append(
+                {
+                    "draw": "points",
+                    "debug": "displacements",
+                    "group": "displacement_target",
+                    "location": np.asarray(target_pts, dtype=np.float32),
+                    "color": self.cfg.overlay.disp_target_color,
+                    "size": self.cfg.overlay.disp_point_radius,
+                }
+            )
+        for idx, (start, end) in enumerate(segments):
+            instructions.append(
+                {
+                    "draw": "segment",
+                    "debug": "displacements",
+                    "points": np.asarray([start, end], dtype=np.float32),
+                    "color": self.cfg.overlay.disp_line_color,
+                    "width": self.cfg.overlay.disp_line_width,
+                    "slot": idx,
+                    "z": -1,
+                }
+            )
+
+        return instructions
 
     def _healthy_with_midline_indices(self) -> list[int]:
         if self.cfg.method.tracked_indices:
@@ -268,7 +525,29 @@ class Pipeline:
 
         instructions.extend(self._region_polygons(landmarks))
 
+
         return instructions
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

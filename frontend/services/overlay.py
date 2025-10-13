@@ -36,18 +36,24 @@ class Overlay:
             "points": self._draw_points,
             "line": self._draw_line,
             "polygon": self._draw_polygon,
+            "segment": self._draw_segment,
         }
 
-        # Points
-        self._point_group: InstructionGroup | None = None
-        self._point_color: Color | None = None
-        self._point_ellipses: list[Ellipse] = []
+        # Points (multiple layers keyed by debug/group)
+        self._point_layers: dict[str, dict[str, object]] = {}
 
         # Lines (color/segment pairs per slot)
         self._line_group: InstructionGroup | None = None
         self._line_colors: list[Color] = []
         self._line_segments: list[Line] = []
         self._line_slots_used: set[int] = set()
+
+        # Finite segments (displacement vectors)
+        self._segment_group: InstructionGroup | None = None
+        self._segment_colors: list[Color] = []
+        self._segment_lines: list[Line] = []
+        self._segment_slots_used: set[int] = set()
+        self._segment_next_slot: int = 0
 
         # Polygons (closed outlines)
         self._poly_group: InstructionGroup | None = None
@@ -71,10 +77,13 @@ class Overlay:
             return frame
 
         self._line_slots_used.clear()
+        self._segment_slots_used.clear()
+        self._segment_next_slot = 0
         self._poly_slots_used.clear()
         self._poly_next_slot = 0
         rendered = False
         items = instructions if isinstance(instructions, (list, tuple)) else [instructions]
+        items = sorted(items, key=lambda item: item.get("z", 0))
 
         for item in items:
             if not getattr(self.cfg.debug, item.get("debug", ""), False):
@@ -87,9 +96,12 @@ class Overlay:
         if not rendered:
             self._clear_points()
             self._clear_lines()
+            self._clear_segments()
             self._clear_polygons()
         else:
+            self._clear_unused_points()
             self._clear_unused_lines()
+            self._clear_unused_segments()
             self._clear_unused_polygons()
 
         return frame
@@ -106,6 +118,12 @@ class Overlay:
         ):
             self._clear_points()
             return frame
+
+        key = overlay.get("group") or overlay.get("debug") or "default"
+        layer = self._point_layers.get(key)
+        if layer is None:
+            layer = {"group": None, "color": None, "ellipses": [], "used": False}
+            self._point_layers[key] = layer
 
         points = np.asarray(points, dtype=np.float32)
         color = _resolve_color(overlay.get("color"), self.cfg.overlay.pts_color)
@@ -125,45 +143,61 @@ class Overlay:
         radius = max(1.0, base_radius * scale)
         diameter = radius * 2.0
 
-        self._ensure_point_primitives(len(points), color)
+        layer_group = layer["group"]
+        layer_color = layer["color"]
+        ellipses = layer["ellipses"]
+
+        if self._canvas is None and self.preview:
+            self._canvas = self.preview.canvas.after
+        if self._canvas is None:
+            return frame
+
+        if layer_group is None:
+            layer_group = InstructionGroup()
+            layer_color = Color(*color)
+            layer_group.add(layer_color)
+            self._canvas.add(layer_group)
+            layer["group"] = layer_group
+            layer["color"] = layer_color
+        else:
+            layer_color.rgba = color
+
+        while len(ellipses) < len(points):
+            ell = Ellipse(size=(0, 0))
+            layer_group.add(ell)
+            ellipses.append(ell)
+
         for idx, (x_norm, y_norm) in enumerate(points):
-            ell = self._point_ellipses[idx]
+            ell = ellipses[idx]
             x_px = offset_x + x_norm * display_w
             y_px = offset_y + (1.0 - y_norm) * display_h
             ell.pos = (x_px - radius, y_px - radius)
             ell.size = (diameter, diameter)
 
-        for idx in range(len(points), len(self._point_ellipses)):
-            self._point_ellipses[idx].size = (0, 0)
+        for idx in range(len(points), len(ellipses)):
+            ellipses[idx].size = (0, 0)
 
+        layer["used"] = True
         return frame
 
-    def _ensure_point_primitives(self, count: int, color: tuple[float, float, float, float]) -> None:
-        if self._canvas is None and self.preview:
-            self._canvas = self.preview.canvas.after
-        if self._canvas is None:
-            return
-
-        if self._point_group is None:
-            self._point_group = InstructionGroup()
-            self._point_color = Color(*color)
-            self._point_group.add(self._point_color)
-            self._canvas.add(self._point_group)
-        elif self._point_color:
-            self._point_color.rgba = color
-
-        while len(self._point_ellipses) < count:
-            ell = Ellipse(size=(0, 0))
-            self._point_group.add(ell)
-            self._point_ellipses.append(ell)
-
     def _clear_points(self) -> None:
-        if self._point_color:
-            r, g, b, _ = self._point_color.rgba
-            self._point_color.rgba = (r, g, b, 0)
-        for ell in self._point_ellipses:
-            ell.size = (0, 0)
+        for layer in self._point_layers.values():
+            color = layer.get("color")
+            if color:
+                r, g, b, _ = color.rgba
+                color.rgba = (r, g, b, 0)
+            for ell in layer.get("ellipses", []):
+                ell.size = (0, 0)
 
+    def _clear_unused_points(self) -> None:
+        for layer in self._point_layers.values():
+            if not layer.get("used"):
+                color = layer.get("color")
+                if color:
+                    r, g, b, _ = color.rgba
+                    color.rgba = (r, g, b, 0)
+                for ell in layer.get("ellipses", []):
+                    ell.size = (0, 0)
     # ------------------------------------------------------------------ #
     # Polygon layer
     # ------------------------------------------------------------------ #
@@ -245,6 +279,91 @@ class Overlay:
             if idx not in self._poly_slots_used:
                 self._poly_colors[idx].rgba = (*self._poly_colors[idx].rgba[:3], 0)
                 seg.points = []
+
+    # ------------------------------------------------------------------ #
+    # Segment layer
+    # ------------------------------------------------------------------ #
+    def _draw_segment(self, frame: Texture, overlay: dict) -> Texture:
+        if not self.preview:
+            self._clear_segments()
+            return frame
+
+        pts = overlay.get("points")
+        if pts is None:
+            return frame
+        pts = np.asarray(pts, dtype=np.float32)
+        if pts.shape != (2, 2):
+            return frame
+
+        color = _resolve_color(overlay.get("color"), self.cfg.overlay.midline_color)
+        width = float(overlay.get("width", self.cfg.overlay.midline_width))
+
+        widget_h, widget_w = self.preview.height, self.preview.width
+        tex_h, tex_w = frame.height, frame.width
+        if widget_w == 0 or widget_h == 0 or tex_w == 0 or tex_h == 0:
+            return frame
+
+        scale = min(widget_w / tex_w, widget_h / tex_h)
+        display_w = tex_w * scale
+        display_h = tex_h * scale
+        offset_x = (widget_w - display_w) / 2.0
+        offset_y = (widget_h - display_h) / 2.0
+
+        coords: list[float] = []
+        for x_norm, y_norm in pts:
+            x_px = offset_x + x_norm * display_w
+            y_px = offset_y + (1.0 - y_norm) * display_h
+            coords.extend([x_px, y_px])
+
+        slot_value = overlay.get("slot")
+        if slot_value is None:
+            slot = self._segment_next_slot
+            self._segment_next_slot += 1
+        else:
+            slot = int(slot_value)
+
+        self._ensure_segment_primitives(slot + 1)
+        color_instr = self._segment_colors[slot]
+        seg = self._segment_lines[slot]
+
+        color_instr.rgba = color
+        seg.points = coords
+        seg.width = width
+
+        self._segment_slots_used.add(slot)
+        return frame
+
+    def _ensure_segment_primitives(self, count: int) -> None:
+        if self._canvas is None and self.preview:
+            self._canvas = self.preview.canvas.after
+        if self._canvas is None:
+            return
+
+        if self._segment_group is None:
+            self._segment_group = InstructionGroup()
+            self._canvas.add(self._segment_group)
+
+        while len(self._segment_lines) < count:
+            color_instr = Color(0, 0, 0, 0)
+            line_instr = Line(points=[0, 0, 0, 0], width=0, cap="round")
+            self._segment_group.add(color_instr)
+            self._segment_group.add(line_instr)
+            self._segment_colors.append(color_instr)
+            self._segment_lines.append(line_instr)
+
+    def _clear_segments(self) -> None:
+        for color_instr in self._segment_colors:
+            r, g, b, _ = color_instr.rgba
+            color_instr.rgba = (r, g, b, 0)
+        for seg in self._segment_lines:
+            seg.points = [0, 0, 0, 0]
+
+    def _clear_unused_segments(self) -> None:
+        for idx, seg in enumerate(self._segment_lines):
+            if idx not in self._segment_slots_used:
+                self._segment_colors[idx].rgba = (*self._segment_colors[idx].rgba[:3], 0)
+                seg.points = [0, 0, 0, 0]
+
 
     # ------------------------------------------------------------------ #
     # Line layer
