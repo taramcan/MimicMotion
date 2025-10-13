@@ -4,6 +4,7 @@ import argparse
 # this patch is required to allow Kivy to run with command line arguments
 # more robust will be from command line run [$env:KIVY_NO_ARGS='1';python main.py <args>]
 import services.kivy_setup
+import os
 
 from kivy.app import App
 from kivy.uix.image import Image
@@ -124,11 +125,10 @@ class MyApp(MDApp):
 
     def build(self):
         self.title = "MimicMotion"
-        # TODO: restore use of App.get_running_app().user_data_dir before shipping.
-        # user_data_dir = App.get_running_app().user_data_dir
-        # db_path = os.path.join(user_data_dir, "mydb.db")
-        self.db_path = Path(__file__).resolve().parent / "mydb.db"
-        db.init_db(self.db_path)
+        user_data_dir = App.get_running_app().user_data_dir
+        db_path = os.path.join(user_data_dir, "mydb.db")
+        db.init_db(db_path)
+        self.db_path = Path(db_path)
 
         Builder.load_file("screens/bottombar.kv")
         root = FloatLayout()
