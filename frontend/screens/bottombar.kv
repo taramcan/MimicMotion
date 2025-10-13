@@ -10,19 +10,6 @@
         spacing: "4dp"
         adaptive_height: True
         MDIconButton:
-            icon: "home"
-            pos_hint: {"center_x": 0.5}
-            on_release: app.go_to_landing()
-        MDLabel:
-            text: "Home"
-            halign: "center"
-            theme_text_color: "Secondary"
-
-    MDBoxLayout:
-        orientation: "vertical"
-        spacing: "4dp"
-        adaptive_height: True
-        MDIconButton:
             icon: "camera"
             pos_hint: {"center_x": 0.5}
             on_release: app.go_to_camera()
@@ -41,5 +28,18 @@
             on_release: app.go_to_progress()
         MDLabel:
             text: "Progress"
+            halign: "center"
+            theme_text_color: "Secondary"
+
+    MDBoxLayout:
+        orientation: "vertical"
+        spacing: "4dp"
+        adaptive_height: True
+        MDIconButton:
+            icon: "account"
+            pos_hint: {"center_x": 0.5}
+            on_release: app.go_to_profile()
+        MDLabel:
+            text: "Profile"
             halign: "center"
             theme_text_color: "Secondary"
