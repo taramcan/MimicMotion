@@ -1,6 +1,6 @@
 absl-py==2.1.0
 attrs==25.4.0
-bcrypt @ file:///C:/b/abs_b3ok3jhxrx/croot/bcrypt_1747402791004/work
+bcrypt==4.2.1
 certifi==2025.10.5
 cffi==2.0.0
 charset-normalizer==3.4.3
@@ -13,33 +13,32 @@ fonttools==4.60.1
 idna==3.10
 jax==0.4.35
 jaxlib==0.4.35
-Kivy==2.3.1
-kivy-deps.angle==0.4.0
-kivy-deps.glew==0.3.1
-Kivy-Garden==0.1.5
-kivy_deps.sdl2==0.8.0
+kivy[base]==2.3.1
+kivy-deps.angle==0.4.0 ; sys_platform == "win32"
+kivy-deps.glew==0.3.1 ; sys_platform == "win32"
+kivy_deps.sdl2==0.8.0 ; sys_platform == "win32"
+kivy-garden==0.1.5
 kivymd==1.2.0
 kiwisolver==1.4.9
 matplotlib==3.10.6
 mediapipe==0.10.21
-ml_dtypes==0.5.3
-numpy @ file:///D:/bld/numpy_1707225528937/work/dist/numpy-1.26.4-cp311-cp311-win_amd64.whl#sha256=537f0573fefb1e93b3633e8a79102e6b6d2911e09e0a90008993efef4242448e
+ml-dtypes==0.5.3
+numpy==1.26.4
 opencv-contrib-python==4.10.0.84
 opencv-python==4.10.0.84
-opt_einsum==3.4.0
+opt-einsum==3.4.0
 packaging==24.1
 pillow==10.4.0
 protobuf==4.25.8
 pycparser==2.23
 Pygments==2.19.2
 pyparsing==3.2.5
-pypiwin32==223
+pypiwin32==223 ; sys_platform == "win32"
 python-dateutil==2.9.0.post0
-pywin32==311
+pywin32==311 ; sys_platform == "win32"
 requests==2.32.5
 scipy==1.13.1
 sentencepiece==0.2.1
 six==1.17.0
 sounddevice==0.5.2
 urllib3==2.5.0
-
