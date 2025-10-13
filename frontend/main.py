@@ -93,14 +93,15 @@ class MyApp(MDApp):
         self.preview.keep_ratio = True
         self.preview.pos_hint = {"center_x": 0.5, "center_y": 0.5}
         self.bottom_nav = None
+        self.db_path: Path | None = None
 
     def build(self):
         self.title = "MimicMotion"
         # TODO: restore use of App.get_running_app().user_data_dir before shipping.
         # user_data_dir = App.get_running_app().user_data_dir
         # db_path = os.path.join(user_data_dir, "mydb.db")
-        db_path = Path(__file__).resolve().parent / "mydb.db"
-        db.init_db(db_path)
+        self.db_path = Path(__file__).resolve().parent / "mydb.db"
+        db.init_db(self.db_path)
 
         Builder.load_file("screens/bottombar.kv")
         root = FloatLayout()
@@ -113,10 +114,6 @@ class MyApp(MDApp):
         landing_screen = Builder.load_file("screens/landingscreen.kv")
         self.screen_manager.add_widget(landing_screen)
 
-        #signup screen
-        signup_screen = Builder.load_file("screens/signupscreen.kv")
-        self.screen_manager.add_widget(signup_screen)
-
         # Camera screen
         camera_screen = Builder.load_file("screens/camerascreen.kv")
         camera_screen.ids.preview_container.add_widget(self.preview)
@@ -126,6 +123,14 @@ class MyApp(MDApp):
         progress_screen = Builder.load_file("screens/progressscreen.kv")
         self.screen_manager.add_widget(progress_screen)
 
+        # Profile screen
+        profile_screen = Builder.load_file("screens/profilescreen.kv")
+        self.screen_manager.add_widget(profile_screen)
+
+        #Edit profile screen
+        edit_profile_screen = Builder.load_file("screens/editprofilescreen.kv")
+        self.screen_manager.add_widget(edit_profile_screen)
+
         root.add_widget(self.screen_manager)
         bottom_nav = Factory.BottomNavBar()
         bottom_nav.size_hint = (1, None)
@@ -134,6 +139,7 @@ class MyApp(MDApp):
         self.bottom_nav = bottom_nav  # keep reference if needed
 
         self.screen_manager.current = "SplashScreen"
+        self.populate_profile_screen()
         return root
 
     def on_start(self):
@@ -155,24 +161,81 @@ class MyApp(MDApp):
     def go_to_progress(self):
         self.screen_manager.current = "ProgressScreen"
 
+    def go_to_profile(self):
+        self.populate_profile_screen()
+        self.screen_manager.current = "ProfileScreen"
+
+    def go_to_edit_profile(self):
+        edit_screen = self.screen_manager.get_screen("EditProfileScreen")
+        user = db.fetch_single_user(self.db_path) if self.db_path else None
+        name, email = "", ""
+        if user:
+            _, stored_name, stored_email = user
+            name = stored_name or ""
+            email = stored_email or ""
+        edit_screen.ids.name_input.text = name
+        edit_screen.ids.email_input.text = email
+        self.screen_manager.current = "EditProfileScreen"
+
     def on_stop(self):
         # shutdown main controller
         if self.controller:
             self.controller()
             self.controller = None
 
-    def sign_in(self):
-        landing = self.screen_manager.get_screen("LandingScreen")
-        # TODO: restore use of App.get_running_app().user_data_dir before shipping.
-        # user_data_dir = App.get_running_app().user_data_dir
-        # db_path = os.path.join(user_data_dir, "mydb.db")
-        db_path = Path(__file__).resolve().parent / "mydb.db"
-        username = landing.ids.username_input.text
-        pw = landing.ids.pw_input.text
-        db.sign_in(db_path, username, pw)
-    
-    def sign_up(self):
-        self.screen_manager.current = "SignUpScreen"
+    def edit_profile(self):
+        if not self.db_path:
+            return
+
+        edit_screen = self.screen_manager.get_screen("EditProfileScreen")
+        username = edit_screen.ids.name_input.text.strip()
+        email = edit_screen.ids.email_input.text.strip()
+
+        if not username:
+            username = "User"
+
+        db.upsert_single_user(self.db_path, username, email)
+        self.populate_profile_screen()
+        self.screen_manager.current = "ProfileScreen"
+
+    def populate_profile_screen(self):
+        if not self.db_path:
+            return
+
+        profile_screen = self.screen_manager.get_screen("ProfileScreen")
+        ids = profile_screen.ids
+
+        # Reset defaults before repopulating.
+        ids.profile_name_value.text = "Not set"
+        ids.profile_email_value.text = "Not set"
+        for idx in range(1, 10):
+            score_label = ids.get(f"profile_score_{idx}")
+            if score_label:
+                score_label.text = "-"
+
+        user = db.fetch_single_user(self.db_path)
+
+        if not user:
+            return
+
+        user_id, username, email = user
+        ids.profile_name_value.text = username or "Not set"
+        ids.profile_email_value.text = email or "Not set"
+
+        session_date, scores = db.fetch_latest_symmetry_scores(self.db_path, user_id)
+
+        if session_date:
+            ids.profile_last_session.text = f"Last session: {session_date}"
+
+        for photo_index, symmetry_score in scores:
+            if 1 <= photo_index <= 9:
+                label = ids.get(f"profile_score_{photo_index}")
+                if label:
+                    label.text = (
+                        f"{symmetry_score:.2f}"
+                        if symmetry_score is not None
+                        else "-"
+                    )
 
 
 if __name__ == "__main__":
