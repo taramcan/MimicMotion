@@ -14,3 +14,10 @@ __pycache__/
 *.db
 *.sqlite
 *.sqlite3
+
+
+# Session photo captures
+frontend/data/sessions/
+
+#mac os build files
+frontend/.DS_Store

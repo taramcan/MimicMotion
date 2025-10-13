@@ -71,7 +71,7 @@ def _create_pose_photos_table(conn: sqlite3.Connection) -> None:
             session_id INTEGER NOT NULL,
             pose_index INTEGER NOT NULL,
             photo_path TEXT NOT NULL,
-            symmetry_score REAL NOT NULL,
+            symmetry_score REAL,
             captured_at TEXT NOT NULL DEFAULT (datetime('now')),
             FOREIGN KEY(session_id) REFERENCES sessions(id),
             UNIQUE(session_id, pose_index),

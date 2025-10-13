@@ -1,0 +1,34 @@
+#:import dp kivy.metrics.dp
+
+MDScreen:
+    name: "ProgressOverviewScreen"
+    MDBoxLayout:
+        orientation: "vertical"
+        padding: [dp(16), dp(8), dp(16), dp(72)]
+        spacing: dp(8)
+
+        MDLabel:
+            text: "Progress Overview"
+            font_style: "H5"
+            halign: "center"
+            size_hint_y: None
+            height: self.texture_size[1]
+
+        ScrollView:
+            size_hint_y: 1
+            do_scroll_x: True
+            scroll_type: ["bars", "content"]
+            bar_width: dp(4)
+
+            MDBoxLayout:
+                id: progress_session_container
+                orientation: "vertical"
+                adaptive_height: True
+                spacing: dp(12)
+                size_hint_x: None
+                width: self.minimum_width
+
+        MDRectangleFlatButton:
+            text: "Log a session"
+            pos_hint: {"center_x": 0.5}
+            on_release: app.go_to_snap()

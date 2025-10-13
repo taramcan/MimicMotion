@@ -1,0 +1,148 @@
+#:import dp kivy.metrics.dp
+
+MDScreen:
+    name: "SnapshotScreen"
+    AnchorLayout:
+        anchor_x: "center"
+        anchor_y: "top"
+        padding: [dp(16), dp(16), dp(16), dp(88)]
+
+        MDCard:
+            orientation: "vertical"
+            size_hint: 1, 1
+            padding: [dp(20), dp(20), dp(20), dp(24)]
+            spacing: dp(16)
+            elevation: 0
+            radius: [18, 18, 18, 18]
+
+
+            MDLabel:
+                text: "Capture Progress"
+                halign: "center"
+                font_style: "H6"
+
+            Widget:
+                size_hint_y: None
+                height: dp(8)
+
+            MDLabel:
+                id: pose_title
+                text: "Ready for Neutral Pose"
+                halign: "center"
+                theme_text_color: "Primary"
+                font_style: "Subtitle2"
+
+            MDLabel:
+                id: pose_instruction
+                text: "Review the example pose, fill up as much of the camera frame as you can, then tap capture."
+                halign: "center"
+                theme_text_color: "Secondary"
+                font_style: "Caption"
+                text_size: (self.width, None)
+                size_hint_y: None
+                height: max(self.texture_size[1], self.font_size)
+                padding: 0, 0
+
+            MDGridLayout:
+                cols: 2
+                spacing: dp(10)
+                size_hint_y: None
+                height: dp(240)
+
+                MDCard:
+                    orientation: "vertical"
+                    padding: dp(6)
+                    radius: [12, 12, 12, 12]
+                    elevation: 0
+                    spacing: dp(4)
+
+                    MDLabel:
+                        text: "Live Preview"
+                        halign: "center"
+                        theme_text_color: "Secondary"
+                        font_style: "Caption"
+                        size_hint_y: None
+                        height: max(self.texture_size[1], self.font_size)
+                        padding: 0, 0
+
+                    AnchorLayout:
+                        size_hint: 1, None
+                        height: dp(180)
+
+                        FloatLayout:
+                            id: progress_preview_container
+                            size_hint: 1, 1
+
+                            Widget:
+                                id: progress_outline_overlay
+                                size_hint: 1, 1
+
+                MDCard:
+                    orientation: "vertical"
+                    padding: dp(6)
+                    radius: [12, 12, 12, 12]
+                    elevation: 0
+                    spacing: dp(4)
+
+                    MDLabel:
+                        text: "Sample Pose"
+                        halign: "center"
+                        theme_text_color: "Secondary"
+                        font_style: "Caption"
+                        size_hint_y: None
+                        height: max(self.texture_size[1], self.font_size)
+                        padding: 0, 0
+
+                    Image:
+                        id: pose_sample
+                        source: "assets/pose1.png"
+                        allow_stretch: True
+                        keep_ratio: True
+                        size_hint: 1, None
+                        height: dp(180)
+
+            MDProgressBar:
+                id: pose_progress
+                value: 0
+                max: 9
+
+            MDLabel:
+                id: pose_counter
+                text: "Pose 1 of 9"
+                halign: "center"
+                theme_text_color: "Secondary"
+
+            Widget:
+                size_hint_y: 1
+
+            AnchorLayout:
+                size_hint_y: None
+                height: dp(56)
+                anchor_x: "center"
+                anchor_y: "center"
+
+                MDBoxLayout:
+                    size_hint_y: None
+                    height: dp(44)
+                    spacing: dp(16)
+                    adaptive_width: True
+
+                    MDRaisedButton:
+                        text: "Capture Pose"
+                        id: capture_button
+                        on_release: app.capture_progress_pose()
+                        size_hint_x: None
+                        width: dp(170)
+
+                    MDFlatButton:
+                        text: "Start Over"
+                        on_release: app.reset_progress_session()
+                        size_hint_x: None
+                        width: dp(120)
+
+            MDFlatButton:
+                text: "Submit Snapshots"
+                pos_hint: {"center_x": 0.5}
+                on_release: app.go_to_progress()
+                size_hint_y: None
+                height: dp(44)

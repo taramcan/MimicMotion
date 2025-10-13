@@ -6,6 +6,7 @@ from kivy.clock import Clock
 from services.config import Config
 from services.pipeline import Pipeline
 from services.camera import Camera
+from typing import Callable, Optional
 
 def build_config(args):
     cfg = Config()
@@ -31,7 +32,7 @@ def build_config(args):
 
     return cfg
 
-def MainController(args, preview_widget=None):
+def MainController(args, preview_widget=None, on_frame: Optional[Callable] = None):
     # Build configuration from command line arguments
     cfg = build_config(args)
 
@@ -59,9 +60,21 @@ def MainController(args, preview_widget=None):
             preview_widget.texture = texture
             preview_widget.texture_size = texture.size
             preview_widget.canvas.ask_update()
+            if on_frame:
+                on_frame(texture)
 
         # Schedule the refresh function to run at the camera's FPS
         # (coat room check frequency)
+        ticker = Clock.schedule_interval(_refresh, 1.0 / cfg.camera.fps)
+    elif on_frame is not None:
+        def _refresh(dt):
+            texture = cam.read()
+            if texture is not None:
+                texture = pipe.process_frame(texture)
+            if texture is None:
+                return
+            on_frame(texture)
+
         ticker = Clock.schedule_interval(_refresh, 1.0 / cfg.camera.fps)
 
     # Shutdown sequence (coat check ticket)
