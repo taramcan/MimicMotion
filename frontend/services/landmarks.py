@@ -26,7 +26,7 @@ class FaceMeshDetector():
         # Intialize to no previous landmarks for smoothing
         self._smooth_landmarks = None
 
-    # detect will return landmarks in (x,y) normalized coordinates
+    # detect will return landmarks in (x, y, z) normalized coordinates
     # or None if no face is detected
     # returned as np.ndarray
     # will have to apply (w,h) multiplication outside to get pixel coordinates
@@ -45,8 +45,8 @@ class FaceMeshDetector():
         # extract the first face's landmarks
         landmarks = result.multi_face_landmarks[0].landmark
 
-        # convert landmarks to x, y coordinates
-        cur = np.asarray([(lm.x, lm.y) for lm in landmarks], dtype=np.float32)
+        # convert landmarks to x, y, z coordinates
+        cur = np.asarray([(lm.x, lm.y, lm.z) for lm in landmarks], dtype=np.float32)
 
         # apply landmark smoothing if needed
         if self._smooth_landmarks is None:
@@ -94,3 +94,4 @@ class FaceMeshDetector():
         arr = np.flipud(arr)
 
         return np.ascontiguousarray(arr)
+

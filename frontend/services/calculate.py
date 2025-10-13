@@ -45,6 +45,10 @@ class LandmarkDisplacement:
     healthy_coords: np.ndarray
     droopy_coords: np.ndarray
 
+    healthy_depth: float | None
+    droopy_depth: float | None
+
+
     perpendicular_line: Line2D
 
     healthy_perp_offset: float
@@ -66,6 +70,7 @@ class MidlineAnchorMetric:
 
     index: int
     coords: np.ndarray
+    depth: float | None
     perpendicular_line: Line2D
     perpendicular_offset: float
 
@@ -139,9 +144,12 @@ def compute_asymmetry_metrics(
         healthy_coords = np.asarray(landmarks[healthy_idx], dtype=np.float32)
         droopy_coords = np.asarray(landmarks[droopy_idx], dtype=np.float32)
 
-        perp_line = _perpendicular_line(healthy_coords, midline)
-        healthy_mid, healthy_perp = _line_projections(healthy_coords, midline)
-        droopy_mid, droopy_perp = _line_projections(droopy_coords, midline)
+        healthy_xy = healthy_coords[:2]
+        droopy_xy = droopy_coords[:2]
+
+        perp_line = _perpendicular_line(healthy_xy, midline)
+        healthy_mid, healthy_perp = _line_projections(healthy_xy, midline)
+        droopy_mid, droopy_perp = _line_projections(droopy_xy, midline)
 
         perp_delta = healthy_perp - droopy_perp
         mid_delta = healthy_mid - droopy_mid
@@ -154,6 +162,8 @@ def compute_asymmetry_metrics(
                 droopy_index=droopy_idx,
                 healthy_coords=healthy_coords,
                 droopy_coords=droopy_coords,
+                healthy_depth=float(healthy_coords[2]) if healthy_coords.shape[0] >= 3 else None,
+                droopy_depth=float(droopy_coords[2]) if droopy_coords.shape[0] >= 3 else None,
                 perpendicular_line=perp_line,
                 healthy_perp_offset=healthy_perp,
                 droopy_perp_offset=droopy_perp,
@@ -171,12 +181,14 @@ def compute_asymmetry_metrics(
         if anchor_idx >= len(landmarks):
             continue
         coords = np.asarray(landmarks[anchor_idx], dtype=np.float32)
-        perp_line = _perpendicular_line(coords, midline)
-        _, perp_offset = _line_projections(coords, midline)
+        xy = coords[:2]
+        perp_line = _perpendicular_line(xy, midline)
+        _, perp_offset = _line_projections(xy, midline)
         midline_metrics.append(
             MidlineAnchorMetric(
                 index=anchor_idx,
                 coords=coords,
+                depth=float(coords[2]) if coords.shape[0] >= 3 else None,
                 perpendicular_line=perp_line,
                 perpendicular_offset=perp_offset,
             )
@@ -278,4 +290,5 @@ def _line_projections(point: np.ndarray, midline: Line2D) -> tuple[float, float]
     mid_component = float(np.dot(rel, direction))
     perp_component = float(np.dot(rel, perp_direction))
     return mid_component, perp_component
+
 

@@ -93,6 +93,7 @@ class Pipeline:
 
         self._last_landmarks: Optional[np.ndarray] = None
         self._last_midline: Optional[Line2D] = None
+        self._last_metrics = None
 
     # ------------------------------------------------------------------ #
     # Public API
@@ -105,9 +106,12 @@ class Pipeline:
         display_landmarks = self._mirror_landmarks_if_needed(landmarks)
         midline, perpendicular = self._compute_midline_overlays(display_landmarks)
 
-        tracked = sorted(nodes.RIGHT_LANDMARKS | nodes.MIDLINE_LANDMARKS)
-        metrics = compute_asymmetry_metrics(self.cfg, midline, tracked, display_landmarks)
-        # print("(%0.2f,%0.2f)"%(metrics.displacements[0].x_delta,metrics.displacements[0].y_delta))
+        pose_ok = self._pose_within_limits(display_landmarks)
+        metrics = None
+        if pose_ok and midline is not None and display_landmarks is not None:
+            tracked = self._healthy_with_midline_indices()
+            metrics = compute_asymmetry_metrics(self.cfg, midline, tracked, display_landmarks)
+        self._last_metrics = metrics
 
         processed_frame = self._flip_texture_if_needed(frame)
 
@@ -146,12 +150,13 @@ class Pipeline:
             self._last_midline = None
             return None, None
 
-        midline = self.midline_helper.midsagittal_line(display_landmarks)
+        xy_landmarks = display_landmarks[:, :2]
+        midline = self.midline_helper.midsagittal_line(xy_landmarks)
         self._last_midline = midline
 
         perpendicular = None
         if midline is not None:
-            node = display_landmarks[61]  # landmark index 1 is the nose tip
+            node = xy_landmarks[61]  # landmark index 1 is the nose tip
             perpendicular = self.midline_helper.midsagittal_perpendicular(node, midline)
 
         return midline, perpendicular
@@ -176,7 +181,7 @@ class Pipeline:
 
         overlays: list[dict] = []
         for path, indices in self._region_groups:
-            region_pts = landmarks[indices]
+            region_pts = landmarks[indices][:, :2]
             hull = _convex_hull(region_pts)
             if hull is None:
                 continue
@@ -192,6 +197,28 @@ class Pipeline:
             )
 
         return overlays
+
+    def _healthy_with_midline_indices(self) -> list[int]:
+        if self.cfg.method.tracked_indices:
+            return sorted(self.cfg.method.tracked_indices)
+
+        droopy = (self.cfg.runtime.droopy or "left").lower()
+        healthy = "right" if droopy == "left" else "left"
+        healthy_set = nodes.RIGHT_LANDMARKS if healthy == "right" else nodes.LEFT_LANDMARKS
+        combined = healthy_set | nodes.MIDLINE_LANDMARKS
+        return sorted(combined)
+
+    def _pose_within_limits(self, landmarks: np.ndarray | None) -> bool:
+        if landmarks is None or landmarks.ndim != 2 or landmarks.shape[1] < 3:
+            return True
+
+        indices = [idx for idx in self.cfg.method.pose_reference_indices if idx < len(landmarks)]
+        if not indices:
+            return True
+
+        z_vals = landmarks[indices, 2]
+        deviations = np.abs(z_vals - z_vals.mean())
+        return float(np.max(deviations)) <= self.cfg.method.pose_max_abs_z
 
     # ------------------------------------------------------------------ #
     # Overlay construction
@@ -209,7 +236,7 @@ class Pipeline:
             {
                 "draw": "points",
                 "debug": "landmarks",
-                "location": landmarks,
+                "location": landmarks[:, :2],
                 "color": self.cfg.overlay.pts_color,
                 "size": self.cfg.overlay.pts_radius,
             }
@@ -242,6 +269,8 @@ class Pipeline:
         instructions.extend(self._region_polygons(landmarks))
 
         return instructions
+
+
 
 
 
