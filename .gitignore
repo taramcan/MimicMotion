@@ -7,11 +7,14 @@ __pycache__/
 
 # Local requirement snapshots
 requirements.txt
+__pycache__/
+*.pyc
 
 # Ignore local database files
 *.db
 *.sqlite
 *.sqlite3
+
 
 # Session photo captures
 frontend/data/sessions/
