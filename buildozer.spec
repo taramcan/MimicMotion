@@ -203,7 +203,8 @@ android.accept_sdk_license = True
 #android.add_resources =
 
 # (list) Gradle dependencies to add
-#android.gradle_dependencies =
+# Gradle dependencies (Maven coordinates)
+android.gradle_dependencies = implementation "com.google.mediapipe:facemesh:0.10.20"
 
 # (bool) Enable AndroidX support. Enable when 'android.gradle_dependencies'
 # contains an 'androidx' package, or any package from Kotlin source.

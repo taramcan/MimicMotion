@@ -1,0 +1,29 @@
+package com.murtha.mimicmotion;
+
+import java.lang.reflect.Constructor;
+
+public final class FaceMeshBridge {
+    private FaceMeshBridge() {}
+
+    public static void init() {
+        instantiate("com.google.mediapipe.solutions.facemesh.FaceMesh");
+        instantiate("com.google.mediapipe.solutions.facemesh.FaceMeshGraph");
+        instantiate("com.google.mediapipe.solutions.facemesh.FaceMeshResult");
+        instantiate("com.google.mediapipe.solutions.facemesh.FaceMeshConnections");
+    }
+
+    private static void instantiate(String className) {
+        try {
+            Class<?> clazz = Class.forName(className, true, FaceMeshBridge.class.getClassLoader());
+            Constructor<?> ctor = clazz.getDeclaredConstructor();
+            ctor.setAccessible(true);
+            ctor.newInstance();
+        } catch (ClassNotFoundException ignored) {
+            // The class will be absent on targets that do not bundle MediaPipe.
+        } catch (ReflectiveOperationException ignored) {
+            // Some classes expose no zero-arg constructor; loading is enough to trigger static init.
+        } catch (LinkageError ignored) {
+            // Ignore missing native bindings; the goal is to best-effort warm the classes.
+        }
+    }
+}
