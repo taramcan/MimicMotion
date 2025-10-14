@@ -1,0 +1,24 @@
+diff -uNr opencv-4.10.0/cmake/OpenCVDetectPython.cmake opencv-4.10.0.mod/cmake/OpenCVDetectPython.cmake
+--- opencv-4.10.0/cmake/OpenCVDetectPython.cmake	2024-07-05 14:29:24.000000000 +0000
++++ opencv-4.10.0.mod/cmake/OpenCVDetectPython.cmake	2024-10-13 21:45:00.000000000 +0000
+@@ -175,7 +175,7 @@
+       endif()
+     endif()
+ 
+-    if(NOT ANDROID AND NOT IOS AND NOT XROS)
++    if(P4A OR NOT ANDROID AND NOT IOS AND NOT XROS)
+       if(CMAKE_HOST_UNIX)
+         execute_process(COMMAND ${_executable} -c "from sysconfig import *; print(get_path('purelib'))"
+                         RESULT_VARIABLE _cvpy_process
+diff -uNr opencv-4.10.0/modules/python/CMakeLists.txt opencv-4.10.0.mod/modules/python/CMakeLists.txt
+--- opencv-4.10.0/modules/python/CMakeLists.txt	2024-07-05 14:29:24.000000000 +0000
++++ opencv-4.10.0.mod/modules/python/CMakeLists.txt	2024-10-13 21:45:00.000000000 +0000
+@@ -3,7 +3,7 @@
+ # ----------------------------------------------------------------------------
+ if(DEFINED OPENCV_INITIAL_PASS)  # OpenCV build
+ 
+-if(ANDROID OR APPLE_FRAMEWORK OR WINRT)
++if(ANDROID AND NOT P4A OR APPLE_FRAMEWORK OR WINRT)
+   ocv_module_disable_(python2)
+   ocv_module_disable_(python3)
+   return()

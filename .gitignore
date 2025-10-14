@@ -20,4 +20,11 @@ __pycache__/
 frontend/data/sessions/
 
 #mac os build files
+.DS_Store
 frontend/.DS_Store
+
+# Buildozer artifacts
+.buildozer/
+.gradle/
+bin/
+buildozer.log
